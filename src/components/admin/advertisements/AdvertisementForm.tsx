@@ -449,7 +449,7 @@ export function AdvertisementForm({
                       <CommandInput placeholder="Procurar empresa..." />
                       {/* O LIST É QUEM ROLA */}
                       <CommandList
-                        className="max-h-60 overflow-y-auto overscroll-contain"
+                        className="max-h-44 overflow-y-auto overscroll-contain"
                         onWheel={(e) => e.stopPropagation()} // ajuda se houver scroll lock externo
                         onWheelCapture={(e) => e.stopPropagation()} // reforço contra Dialog/Drawer
                       >
