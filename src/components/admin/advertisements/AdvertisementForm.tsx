@@ -444,7 +444,7 @@ export function AdvertisementForm({
                       </Button>
                     </FormControl>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                  <PopoverContent className="w-[350px] max-h-[250px] overflow-y-auto p-0">
                     <Command>
                       <CommandInput placeholder="Procurar empresa..." />
                       <CommandList>
