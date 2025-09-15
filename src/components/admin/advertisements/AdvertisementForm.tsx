@@ -444,27 +444,28 @@ export function AdvertisementForm({
                       </Button>
                     </FormControl>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[350px] max-h-[250px] overflow-y-auto p-0">
+                  <PopoverContent className="w-[350px] p-0">
                     <Command>
                       <CommandInput placeholder="Procurar empresa..." />
-                      <CommandList>
+                      {/* O LIST É QUEM ROLA */}
+                      <CommandList
+                        className="max-h-60 overflow-y-auto overscroll-contain"
+                        onWheel={(e) => e.stopPropagation()} // ajuda se houver scroll lock externo
+                        onWheelCapture={(e) => e.stopPropagation()} // reforço contra Dialog/Drawer
+                      >
                         <CommandEmpty>Nenhuma empresa encontrada.</CommandEmpty>
                         <CommandGroup>
                           {companies.map((company) => (
                             <CommandItem
-                              value={company.name}
                               key={company.id}
+                              value={company.name}
                               onSelect={() => {
-                                const currentValue = field.value || [];
-                                const isSelected = currentValue.includes(
-                                  company.id
+                                const current = field.value ?? [];
+                                field.onChange(
+                                  current.includes(company.id)
+                                    ? current.filter((id) => id !== company.id)
+                                    : [...current, company.id]
                                 );
-                                const newValue = isSelected
-                                  ? currentValue.filter(
-                                      (id) => id !== company.id
-                                    )
-                                  : [...currentValue, company.id];
-                                field.onChange(newValue);
                               }}
                             >
                               <Check
