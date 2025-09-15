@@ -19,17 +19,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PlusCircle } from "lucide-react";
+import { LayoutGrid, List, PlusCircle } from "lucide-react";
 import { useState, useTransition } from "react";
-import { Advertisement, Company } from "@/types";
-import { AdvertisementForm } from "./AdvertisementForm";
-import { DataTable } from "./AdvertisementsDataTable";
-import { columns } from "./AdvertisementsColumns";
-import { deleteAdvertisement } from "@/actions/advertisements";
 import { toast } from "sonner";
 
+// Importando os tipos oficiais
+import { Advertisement, Company } from "@/types";
+
+// Importando os componentes filhos
+import { deleteAdvertisement } from "@/actions/advertisements";
+import { AdvertisementForm } from "./AdvertisementForm";
+import { AdvertisementsCard } from "./AdvertisementsCard";
+import { columns } from "./AdvertisementsColumns";
+import { DataTable } from "./AdvertisementsDataTable";
+
+// O tipo de dado esperado por este componente cliente.
+// Geralmente, os dados vêm de uma query com JOIN, garantindo que 'companies' seja um array.
 export type AdvertisementWithCompanies = Advertisement & {
-  companies: Pick<Company, "id" | "name">[];
+  companies: Company[];
 };
 
 interface AdvertisementsClientProps {
@@ -49,28 +56,36 @@ export function AdvertisementsClient({
     useState<AdvertisementWithCompanies | null>(null);
   const [isDeletePending, startDeleteTransition] = useTransition();
 
+  // Estado para controlar a visualização (grade ou tabela), iniciando com grade
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+
+  // Abre o modal de edição/criação
   const handleOpenModal = (ad: AdvertisementWithCompanies | null) => {
     setCurrentAd(ad);
     setIsModalOpen(true);
   };
+
+  // Fecha o modal de edição/criação
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setCurrentAd(null);
   };
 
+  // Abre o diálogo de confirmação para exclusão
   const handleOpenDeleteDialog = (ad: AdvertisementWithCompanies) => {
     setAdToDelete(ad);
   };
 
+  // Executa a ação de deletar o anúncio
   const handleDeleteAd = () => {
     if (!adToDelete) return;
 
     startDeleteTransition(async () => {
       const result = await deleteAdvertisement(adToDelete.id);
       if (result.success) {
-        toast.success(result.message);
+        toast.success(result.message || "Anúncio excluído com sucesso!");
       } else {
-        toast.error(result.message);
+        toast.error(result.message || "Erro ao excluir o anúncio.");
       }
       setAdToDelete(null);
     });
@@ -78,23 +93,57 @@ export function AdvertisementsClient({
 
   return (
     <>
-      <div className="flex items-center justify-end">
+      {/* Cabeçalho com Seletor de View e Botão de Adicionar */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <Button
+            variant={viewMode === "grid" ? "default" : "outline"}
+            size="icon"
+            onClick={() => setViewMode("grid")}
+            aria-label="Visualizar em grade"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={viewMode === "table" ? "default" : "outline"}
+            size="icon"
+            onClick={() => setViewMode("table")}
+            aria-label="Visualizar em tabela"
+          >
+            <List className="h-4 w-4" />
+          </Button>
+        </div>
+
         <Button onClick={() => handleOpenModal(null)}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Adicionar Anúncio
         </Button>
       </div>
 
-      <DataTable
-        columns={columns({
-          onEdit: handleOpenModal,
-          onDelete: handleOpenDeleteDialog,
-        })}
-        data={initialAdvertisements}
-      />
+      {/* Renderização Condicional: Grade de Cards ou Tabela */}
+      {viewMode === "grid" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {initialAdvertisements.map((ad) => (
+            <AdvertisementsCard
+              key={ad.id}
+              anuncio={ad}
+              onEdit={handleOpenModal}
+              onDelete={handleOpenDeleteDialog}
+            />
+          ))}
+        </div>
+      ) : (
+        <DataTable
+          columns={columns({
+            onEdit: handleOpenModal,
+            onDelete: handleOpenDeleteDialog,
+          })}
+          data={initialAdvertisements}
+        />
+      )}
 
+      {/* Modal para Criar/Editar Anúncio */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        {/* MELHORIA APLICADA AQUI */}
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -114,6 +163,7 @@ export function AdvertisementsClient({
         </DialogContent>
       </Dialog>
 
+      {/* Diálogo de Confirmação para Excluir Anúncio */}
       <AlertDialog open={!!adToDelete} onOpenChange={() => setAdToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
