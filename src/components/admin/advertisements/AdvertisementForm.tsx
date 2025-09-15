@@ -46,17 +46,16 @@ import {
 } from "@/actions/advertisements";
 import { AdvertisementWithCompanies } from "./AdvertisementsClient";
 
-// 1. DEFINIÇÃO DO ESQUEMA DE SAÍDA (OUTPUT/TRANSFORMADO)
-// Este esquema define a forma final dos dados após a transformação do Zod.
-const adOutputSchema = z
+// Esquema de validação do formulário, preparado para ser executado no servidor (SSR-safe).
+const formSchema = z
   .object({
     id: z.string().optional(),
     title: z.string().min(3, "O título é obrigatório."),
     description: z.string().optional(),
-    // CORREÇÃO: Removido o parâmetro de erro inválido.
     type: z.nativeEnum(AdvertisementType),
-    content_url: z.string().url("Por favor, insira uma URL válida."),
-    // CORREÇÃO: Removido o parâmetro de erro inválido.
+    // Usamos z.any() para ser seguro no servidor. A validação real do ficheiro é feita no .refine() abaixo.
+    content_file: z.any().optional(),
+    content_url: z.string().optional(),
     start_date: z.date(),
     end_date: z.date(),
     duration_seconds: z
@@ -65,10 +64,7 @@ const adOutputSchema = z
         (val) => !isNaN(Number(val)) && Number(val) >= 5,
         "A duração mínima é 5 segundos."
       ),
-    // .default() é a transformação que causa a diferença entre input e output
-    status: z
-      .nativeEnum(AdvertisementStatus)
-      .default(AdvertisementStatus.ACTIVE),
+    status: z.nativeEnum(AdvertisementStatus),
     company_ids: z.array(z.string()).min(1, "Selecione ao menos uma empresa."),
     overlay_text: z.string().optional(),
     overlay_position: z.nativeEnum(OverlayPosition).optional(),
@@ -78,11 +74,41 @@ const adOutputSchema = z
   .refine((data) => data.end_date >= data.start_date, {
     message: "A data final deve ser igual ou posterior à data inicial.",
     path: ["end_date"],
-  });
+  })
+  .refine(
+    (data) => {
+      const isUpload =
+        data.type === AdvertisementType.IMAGE_UPLOAD ||
+        data.type === AdvertisementType.VIDEO_UPLOAD;
+      const isLink =
+        data.type === AdvertisementType.IMAGE_LINK ||
+        data.type === AdvertisementType.VIDEO_LINK ||
+        data.type === AdvertisementType.EMBED_LINK;
 
-// 2. DEFINIÇÃO DOS TIPOS DE ENTRADA (INPUT) E SAÍDA (OUTPUT)
-type AdFormInput = z.input<typeof adOutputSchema>;
-type AdFormOutput = z.output<typeof adOutputSchema>;
+      if (isLink) {
+        return (
+          !!data.content_url &&
+          z.string().url().safeParse(data.content_url).success
+        );
+      }
+      if (isUpload) {
+        // A validação no cliente irá verificar se é um FileList.
+        return (
+          (data.content_file instanceof FileList &&
+            data.content_file.length > 0) ||
+          !!data.content_url
+        );
+      }
+      return false; // Nenhum tipo selecionado ainda
+    },
+    {
+      message:
+        "Um ficheiro (para Upload) ou uma URL válida (para Link) é obrigatório.",
+      path: ["content_url"], // O erro será mostrado no campo de URL ou ficheiro
+    }
+  );
+
+type FormSchemaData = z.infer<typeof formSchema>;
 
 interface AdvertisementFormProps {
   initialData: AdvertisementWithCompanies | null;
@@ -95,9 +121,8 @@ export function AdvertisementForm({
   companies,
   onSuccess,
 }: AdvertisementFormProps) {
-  // 3. USAR A ASSINATURA COMPLETA E CORRETA DO useForm
-  const form = useForm<AdFormInput, undefined, AdFormOutput>({
-    resolver: zodResolver(adOutputSchema),
+  const form = useForm<FormSchemaData>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       id: initialData?.id || undefined,
       title: initialData?.title || "",
@@ -111,27 +136,45 @@ export function AdvertisementForm({
         ? new Date(initialData.end_date)
         : undefined,
       duration_seconds: String(initialData?.duration_seconds || 15),
-      status: initialData?.status, // Sem o default, o Zod cuida disso
+      status: initialData?.status || AdvertisementStatus.ACTIVE,
       company_ids: initialData?.companies.map((c) => c.id) || [],
       overlay_text: initialData?.overlay_text || "",
-      overlay_position: initialData?.overlay_position || undefined,
+      overlay_position: initialData?.overlay_position || OverlayPosition.BOTTOM,
       overlay_bg_color: initialData?.overlay_bg_color || "#000000",
       overlay_text_color: initialData?.overlay_text_color || "#FFFFFF",
     },
   });
 
-  // 4. O TIPO DE 'data' no onSubmit AGORA É AdFormOutput, O TIPO CORRETO E TRANSFORMADO
-  const onSubmit = async (data: AdFormOutput) => {
+  const adType = form.watch("type");
+  const fileRef = form.register("content_file");
+  const overlayText = form.watch("overlay_text");
+
+  const onSubmit = async (data: FormSchemaData) => {
     const formData = new FormData();
+
     Object.entries(data).forEach(([key, value]) => {
-      if (value instanceof Date) {
+      if (
+        key === "content_file" &&
+        value instanceof FileList &&
+        value.length > 0
+      ) {
+        formData.append("content_file", value[0]);
+      } else if (value instanceof Date) {
         formData.append(key, value.toISOString());
       } else if (Array.isArray(value)) {
         formData.append(key, value.join(","));
-      } else if (value != null) {
+      } else if (value != null && key !== "content_file") {
         formData.append(key, String(value));
       }
     });
+
+    if (
+      initialData &&
+      !formData.has("content_file") &&
+      initialData.content_url
+    ) {
+      formData.append("content_url", initialData.content_url);
+    }
 
     const action = initialData ? updateAdvertisement : createAdvertisement;
     const result = await action(formData);
@@ -144,7 +187,7 @@ export function AdvertisementForm({
         Object.entries(result.message).forEach(([key, value]) => {
           if (key === "_server") toast.error(value.join(", "));
           else
-            form.setError(key as keyof AdFormInput, {
+            form.setError(key as keyof FormSchemaData, {
               message: (value as string[]).join(", "),
             });
         });
@@ -154,227 +197,345 @@ export function AdvertisementForm({
 
   return (
     <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(onSubmit)}
-        className="grid grid-cols-1 md:grid-cols-2 gap-6"
-      >
-        {/* ... O resto do seu JSX continua igual ... */}
-        {/* Coluna da Esquerda */}
-        <div className="space-y-4">
-          <FormField
-            control={form.control}
-            name="title"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Título</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="description"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Descrição (Opcional)</FormLabel>
-                <FormControl>
-                  <Textarea {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="type"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Tipo de Anúncio</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o tipo" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value={AdvertisementType.IMAGE}>
-                      Imagem
-                    </SelectItem>
-                    <SelectItem value={AdvertisementType.VIDEO}>
-                      Vídeo
-                    </SelectItem>
-                    <SelectItem value={AdvertisementType.EMBED}>
-                      Incorporação (Embed)
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="content_url"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>URL do Conteúdo</FormLabel>
-                <FormControl>
-                  <Input placeholder="https://..." {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="duration_seconds"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Duração (segundos)</FormLabel>
-                <FormControl>
-                  <Input type="number" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        {/* Coluna da Direita */}
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Coluna da Esquerda */}
+          <div className="space-y-4">
             <FormField
               control={form.control}
-              name="start_date"
+              name="title"
               render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Data de Início</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left font-normal"
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP", { locale: ptBR })
-                          ) : (
-                            <span>Escolha uma data</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                <FormItem>
+                  <FormLabel>Título</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <FormField
               control={form.control}
-              name="end_date"
+              name="type"
               render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Data de Fim</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left font-normal"
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP", { locale: ptBR })
-                          ) : (
-                            <span>Escolha uma data</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        initialFocus
+                <FormItem>
+                  <FormLabel>Tipo de Anúncio</FormLabel>
+                  <Select
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      form.setValue("content_url", "");
+                      form.setValue("content_file", undefined);
+                      form.clearErrors("content_url");
+                    }}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={AdvertisementType.IMAGE_UPLOAD}>
+                        Upload de Imagem
+                      </SelectItem>
+                      <SelectItem value={AdvertisementType.VIDEO_UPLOAD}>
+                        Upload de Vídeo
+                      </SelectItem>
+                      <SelectItem value={AdvertisementType.IMAGE_LINK}>
+                        Link de Imagem
+                      </SelectItem>
+                      <SelectItem value={AdvertisementType.VIDEO_LINK}>
+                        Link de Vídeo
+                      </SelectItem>
+                      <SelectItem value={AdvertisementType.EMBED_LINK}>
+                        Link de Incorporação
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* --- CAMPO DE CONTEÚDO CONDICIONAL --- */}
+            {adType?.includes("LINK") ? (
+              <FormField
+                control={form.control}
+                name="content_url"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>URL do Conteúdo</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="https://exemplo.com/imagem.jpg"
+                        {...field}
                       />
-                    </PopoverContent>
-                  </Popover>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : adType?.includes("UPLOAD") ? (
+              <FormField
+                control={form.control}
+                name="content_file"
+                render={() => (
+                  <FormItem>
+                    <FormLabel>Ficheiro do Anúncio</FormLabel>
+                    <FormControl>
+                      <Input
+                        id="dropzone-file"
+                        type="file"
+                        {...fileRef}
+                        accept={
+                          adType === AdvertisementType.IMAGE_UPLOAD
+                            ? "image/*"
+                            : "video/mp4,video/webm"
+                        }
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : null}
+            {/* --- FIM DO CAMPO CONDICIONAL --- */}
+
+            <FormField
+              control={form.control}
+              name="duration_seconds"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Duração (segundos)</FormLabel>
+                  <FormControl>
+                    <Input type="number" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descrição (Opcional)</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
           </div>
+
+          {/* Coluna da Direita */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="start_date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Data de Início</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start text-left font-normal"
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP", { locale: ptBR })
+                            ) : (
+                              <span>Escolha uma data</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="end_date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Data de Fim</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start text-left font-normal"
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP", { locale: ptBR })
+                            ) : (
+                              <span>Escolha uma data</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="company_ids"
+              render={() => (
+                <FormItem>
+                  <FormLabel>Exibir nas Empresas</FormLabel>
+                  <div className="space-y-2 rounded-md border p-4 max-h-48 overflow-y-auto">
+                    {companies.map((company) => (
+                      <FormField
+                        key={company.id}
+                        control={form.control}
+                        name="company_ids"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes(company.id)}
+                                onCheckedChange={(checked) => {
+                                  const currentValue = field.value || [];
+                                  return checked
+                                    ? field.onChange([
+                                        ...currentValue,
+                                        company.id,
+                                      ])
+                                    : field.onChange(
+                                        currentValue.filter(
+                                          (id) => id !== company.id
+                                        )
+                                      );
+                                }}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              {company.name}
+                            </FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+
+        {/* Secção de Overlay */}
+        <div className="space-y-4 rounded-lg border p-4">
+          <h3 className="text-lg font-medium">Overlay Opcional</h3>
           <FormField
             control={form.control}
-            name="company_ids"
-            render={() => (
+            name="overlay_text"
+            render={({ field }) => (
               <FormItem>
-                <FormLabel>Exibir nas Empresas</FormLabel>
-                <div className="space-y-2 rounded-md border p-4 max-h-48 overflow-y-auto">
-                  {companies.map((company) => (
-                    <FormField
-                      key={company.id}
-                      control={form.control}
-                      name="company_ids"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value?.includes(company.id)}
-                              onCheckedChange={(checked) => {
-                                const currentValue = field.value || [];
-                                return checked
-                                  ? field.onChange([
-                                      ...currentValue,
-                                      company.id,
-                                    ])
-                                  : field.onChange(
-                                      currentValue.filter(
-                                        (id) => id !== company.id
-                                      )
-                                    );
-                              }}
-                            />
-                          </FormControl>
-                          <FormLabel className="font-normal">
-                            {company.name}
-                          </FormLabel>
-                        </FormItem>
-                      )}
-                    />
-                  ))}
-                </div>
+                <FormLabel>Texto do Overlay</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder="Escreva uma mensagem para sobrepor ao anúncio..."
+                    {...field}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
+          {overlayText && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end animate-in fade-in-50">
+              <FormField
+                control={form.control}
+                name="overlay_position"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Posição</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={OverlayPosition.TOP}>
+                          Topo
+                        </SelectItem>
+                        <SelectItem value={OverlayPosition.BOTTOM}>
+                          Rodapé
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="overlay_bg_color"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cor do Fundo</FormLabel>
+                    <FormControl>
+                      <Input type="color" {...field} className="h-10 p-1" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="overlay_text_color"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cor do Texto</FormLabel>
+                    <FormControl>
+                      <Input type="color" {...field} className="h-10 p-1" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          )}
         </div>
 
-        <div className="md:col-span-2">
-          <LoadingButton
-            type="submit"
-            loading={form.formState.isSubmitting}
-            className="w-full"
-          >
-            {initialData ? "Salvar Alterações" : "Criar Anúncio"}
-          </LoadingButton>
-        </div>
+        <LoadingButton
+          type="submit"
+          loading={form.formState.isSubmitting}
+          className="w-full"
+        >
+          {initialData ? "Salvar Alterações" : "Criar Anúncio"}
+        </LoadingButton>
       </form>
     </Form>
   );

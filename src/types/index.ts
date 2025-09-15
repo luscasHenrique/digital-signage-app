@@ -17,9 +17,11 @@ export type UserWithProfile = User &
 
 // Enums para os Anúncios
 export enum AdvertisementType {
-  IMAGE = "IMAGE",
-  VIDEO = "VIDEO",
-  EMBED = "EMBED",
+  IMAGE_UPLOAD = "IMAGE_UPLOAD", // Upload de uma imagem
+  VIDEO_UPLOAD = "VIDEO_UPLOAD", // Upload de um vídeo
+  IMAGE_LINK = "IMAGE_LINK", // Link para uma imagem externa
+  VIDEO_LINK = "VIDEO_LINK", // Link para um vídeo externo
+  EMBED_LINK = "EMBED_LINK", // Link de incorporação (YouTube, etc.)
 }
 
 export enum AdvertisementStatus {

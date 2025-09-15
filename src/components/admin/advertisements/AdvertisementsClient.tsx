@@ -1,6 +1,16 @@
 // src/components/admin/advertisements/AdvertisementsClient.tsx
 "use client";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,10 +20,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PlusCircle } from "lucide-react";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Advertisement, Company } from "@/types";
-import { AdvertisementForm } from "./AdvertisementForm"; // 1. Importar o formulário
+import { AdvertisementForm } from "./AdvertisementForm";
+import { DataTable } from "./AdvertisementsDataTable";
+import { columns } from "./AdvertisementsColumns";
+import { deleteAdvertisement } from "@/actions/advertisements";
+import { toast } from "sonner";
 
+// Este tipo é exportado para que outros ficheiros (como o AdvertisementForm) o possam usar.
 export type AdvertisementWithCompanies = Advertisement & {
   companies: Pick<Company, "id" | "name">[];
 };
@@ -32,6 +47,11 @@ export function AdvertisementsClient({
     null
   );
 
+  // Estados para gerir o diálogo de confirmação de eliminação
+  const [adToDelete, setAdToDelete] =
+    useState<AdvertisementWithCompanies | null>(null);
+  const [isDeletePending, startDeleteTransition] = useTransition();
+
   const handleOpenModal = (ad: AdvertisementWithCompanies | null) => {
     setCurrentAd(ad);
     setIsModalOpen(true);
@@ -40,6 +60,24 @@ export function AdvertisementsClient({
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setCurrentAd(null);
+  };
+
+  const handleOpenDeleteDialog = (ad: AdvertisementWithCompanies) => {
+    setAdToDelete(ad);
+  };
+
+  const handleDeleteAd = () => {
+    if (!adToDelete) return;
+
+    startDeleteTransition(async () => {
+      const result = await deleteAdvertisement(adToDelete.id);
+      if (result.success) {
+        toast.success(result.message);
+      } else {
+        toast.error(result.message);
+      }
+      setAdToDelete(null); // Fecha o diálogo de confirmação
+    });
   };
 
   return (
@@ -51,15 +89,17 @@ export function AdvertisementsClient({
         </Button>
       </div>
 
-      {/* A tabela entrará aqui em breve */}
-      <div className="rounded-md border p-4">
-        <p className="text-center text-muted-foreground">
-          A tabela de anúncios será implementada aqui.
-        </p>
-      </div>
+      {/* O placeholder foi substituído pela nossa DataTable funcional */}
+      <DataTable
+        columns={columns({
+          onEdit: handleOpenModal,
+          onDelete: handleOpenDeleteDialog, // Passamos a função de eliminação
+        })}
+        data={initialAdvertisements}
+      />
 
+      {/* Modal para Criar/Editar Anúncio */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        {/* Aumentamos o tamanho do modal para o formulário caber melhor */}
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>
@@ -71,7 +111,6 @@ export function AdvertisementsClient({
                 : "Preencha os dados para criar um novo anúncio."}
             </DialogDescription>
           </DialogHeader>
-          {/* 2. Usar o componente de formulário */}
           <AdvertisementForm
             initialData={currentAd}
             companies={companies}
@@ -79,6 +118,29 @@ export function AdvertisementsClient({
           />
         </DialogContent>
       </Dialog>
+
+      {/* Diálogo de Confirmação de Eliminação */}
+      <AlertDialog open={!!adToDelete} onOpenChange={() => setAdToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Isso excluirá permanentemente o
+              anúncio <span className="font-bold">{adToDelete?.title}</span>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAd}
+              disabled={isDeletePending}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeletePending ? "Excluindo..." : "Sim, excluir anúncio"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
