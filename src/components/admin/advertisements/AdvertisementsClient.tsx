@@ -28,7 +28,6 @@ import { columns } from "./AdvertisementsColumns";
 import { deleteAdvertisement } from "@/actions/advertisements";
 import { toast } from "sonner";
 
-// Este tipo é exportado para que outros ficheiros (como o AdvertisementForm) o possam usar.
 export type AdvertisementWithCompanies = Advertisement & {
   companies: Pick<Company, "id" | "name">[];
 };
@@ -46,8 +45,6 @@ export function AdvertisementsClient({
   const [currentAd, setCurrentAd] = useState<AdvertisementWithCompanies | null>(
     null
   );
-
-  // Estados para gerir o diálogo de confirmação de eliminação
   const [adToDelete, setAdToDelete] =
     useState<AdvertisementWithCompanies | null>(null);
   const [isDeletePending, startDeleteTransition] = useTransition();
@@ -56,7 +53,6 @@ export function AdvertisementsClient({
     setCurrentAd(ad);
     setIsModalOpen(true);
   };
-
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setCurrentAd(null);
@@ -76,7 +72,7 @@ export function AdvertisementsClient({
       } else {
         toast.error(result.message);
       }
-      setAdToDelete(null); // Fecha o diálogo de confirmação
+      setAdToDelete(null);
     });
   };
 
@@ -89,18 +85,17 @@ export function AdvertisementsClient({
         </Button>
       </div>
 
-      {/* O placeholder foi substituído pela nossa DataTable funcional */}
       <DataTable
         columns={columns({
           onEdit: handleOpenModal,
-          onDelete: handleOpenDeleteDialog, // Passamos a função de eliminação
+          onDelete: handleOpenDeleteDialog,
         })}
         data={initialAdvertisements}
       />
 
-      {/* Modal para Criar/Editar Anúncio */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-3xl">
+        {/* MELHORIA APLICADA AQUI */}
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {currentAd ? "Editar Anúncio" : "Criar Novo Anúncio"}
@@ -119,7 +114,6 @@ export function AdvertisementsClient({
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo de Confirmação de Eliminação */}
       <AlertDialog open={!!adToDelete} onOpenChange={() => setAdToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
