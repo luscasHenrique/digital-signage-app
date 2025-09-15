@@ -34,14 +34,6 @@ export const menuData: MenuItem[] = [
         href: "/dashboard/anuncios",
         label: "Todos os Anúncios",
       },
-      {
-        href: "/dashboard/anuncios/novo",
-        label: "Criar Anúncio",
-      },
-      {
-        href: "/dashboard/anuncios/categorias",
-        label: "Categorias",
-      },
     ],
   },
   {
