@@ -1,15 +1,14 @@
-// src/app/(admin)/layout.tsx
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server"; // ATUALIZADO AQUI
 import { redirect } from "next/navigation";
 import { PropsWithChildren } from "react";
 import { UserNav } from "@/components/admin/UserNav";
-import { SidebarNav } from "@/components/admin/SidebarNav"; // 1. Importar o novo componente
+import { SidebarNav } from "@/components/admin/SidebarNav";
 import Link from "next/link";
 import { Package } from "lucide-react";
 import { UserRole } from "@/types";
 
 export default async function DashboardLayout({ children }: PropsWithChildren) {
-  const supabase = createServerClient();
+  const supabase = createClient(); // E ATUALIZADO AQUI
 
   const {
     data: { user },
@@ -29,7 +28,6 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
     return redirect("/login?message=Erro ao carregar perfil de usuário.");
   }
 
-  // Garantimos que a role seja do tipo UserRole, com um fallback seguro.
   const userRole = (profile.role as UserRole) || UserRole.STANDARD;
 
   return (
@@ -42,8 +40,6 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
               <span className="">Digital Signage</span>
             </Link>
           </div>
-
-          {/* 2. Usar o novo componente aqui */}
           <SidebarNav userRole={userRole} />
         </div>
       </div>

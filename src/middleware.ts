@@ -1,62 +1,75 @@
-//src/middleware.ts
+// src/middleware.ts
 
-import { createServerClient } from "@/lib/supabase/server";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
-  // Cria uma resposta inicial. O middleware precisa retornar ou passar adiante
-  // um objeto de resposta.
-  const response = NextResponse.next({
+  // Cria uma resposta inicial que será usada e, se necessário, modificada.
+  let response = NextResponse.next({
     request: {
       headers: request.headers,
     },
   });
 
-  // Cria um cliente Supabase que pode operar dentro do contexto do middleware.
-  // Ele usa a resposta para poder ler e escrever cookies.
-  const supabase = createServerClient();
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-  // Atualiza a sessão do usuário com base nos cookies da requisição.
-  // Isso é crucial para manter o usuário logado.
+  // Cria um cliente Supabase específico para o contexto do Middleware.
+  // A mágica está neste objeto de 'cookies', que ensina o Supabase
+  // a ler da 'request' e escrever na 'response'.
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
+    cookies: {
+      get(name: string) {
+        return request.cookies.get(name)?.value;
+      },
+      set(name: string, value: string, options: CookieOptions) {
+        // O middleware atualiza o cookie na requisição e na resposta.
+        request.cookies.set({ name, value, ...options });
+        response = NextResponse.next({
+          request: {
+            headers: request.headers,
+          },
+        });
+        response.cookies.set({ name, value, ...options });
+      },
+      remove(name: string, options: CookieOptions) {
+        // O middleware remove o cookie na requisição e na resposta.
+        request.cookies.set({ name, value: "", ...options });
+        response = NextResponse.next({
+          request: {
+            headers: request.headers,
+          },
+        });
+        response.cookies.set({ name, value: "", ...options });
+      },
+    },
+  });
+
+  // Força a atualização da sessão do usuário. Essencial para o middleware.
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
   const { pathname } = request.nextUrl;
 
-  // --- LÓGICA DE PROTEÇÃO DE ROTAS ---
+  // --- SUA LÓGICA DE PROTEÇÃO DE ROTAS (JÁ ESTAVA CORRETA) ---
 
-  // 1. Se o usuário NÃO está logado e tenta acessar qualquer rota
-  //    dentro de "/dashboard", redireciona para a página de login.
+  // 1. Redireciona para /login se não houver sessão e o acesso for ao /dashboard
   if (!session && pathname.startsWith("/dashboard")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // 2. Se o usuário JÁ ESTÁ logado e tenta acessar a página de login,
-  //    redireciona para o dashboard.
+  // 2. Redireciona para /dashboard se houver sessão e o acesso for ao /login
   if (session && pathname === "/login") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // 3. Para todas as outras requisições, permite que continuem normalmente.
+  // 3. Permite a continuação da requisição.
+  // Retorna a 'response' que pode ter sido atualizada com novos cookies.
   return response;
 }
 
-// Configuração do "matcher" para definir em quais rotas o middleware deve rodar.
-// Evitamos que ele rode em arquivos estáticos (_next/static), imagens, etc.
+// A sua configuração de 'matcher' já estava correta.
 export const config = {
-  matcher: [
-    /*
-     * Corresponde a todos os caminhos de requisição, exceto os que começam com:
-     * - api (rotas de API)
-     * - _next/static (arquivos estáticos)
-     * - _next/image (otimização de imagem)
-     * - favicon.ico (ícone do site)
-     */
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

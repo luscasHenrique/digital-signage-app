@@ -1,16 +1,16 @@
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server"; // PONTO 1: Importa a função correta
 import { AdvertisementsClient } from "@/components/admin/advertisements/AdvertisementsClient";
 import { Company } from "@/types";
 
 // Função assíncrona que busca os dados no servidor antes de a página ser renderizada.
 async function getData() {
-  const supabase = createServerClient();
+  const supabase = createClient(); // PONTO 1: Usa a função correta
 
   // Usamos um select especial para buscar os anúncios e, para cada um,
   // as empresas associadas através da nossa tabela de junção.
   const { data: advertisements, error: adError } = await supabase
     .from("advertisements")
-    .select("*, companies(id, name)")
+    .select("*, companies(id, name)") // Busca anúncios e as empresas relacionadas
     .order("created_at", { ascending: false });
 
   // Também buscamos todas as empresas disponíveis. Iremos usá-las no formulário
@@ -25,11 +25,9 @@ async function getData() {
       "Erro ao buscar dados para a página de anúncios:",
       adError || companyError
     );
-    // Num cenário real, poderíamos lançar um erro aqui para ser capturado por um error.tsx
   }
 
   return {
-    // Garantimos que retornamos sempre um array, mesmo que a busca falhe
     advertisements: advertisements || [],
     companies: companies || [],
   };
@@ -37,6 +35,13 @@ async function getData() {
 
 export default async function AnunciosPage() {
   const { advertisements, companies } = await getData();
+
+  // PONTO 2: Garantimos que a propriedade 'companies' em cada anúncio seja sempre um array.
+  // Isso evita erros de tipo no componente cliente.
+  const typedAdvertisements = advertisements.map((ad) => ({
+    ...ad,
+    companies: ad.companies || [],
+  }));
 
   return (
     <div className="flex flex-col gap-4">
@@ -50,7 +55,7 @@ export default async function AnunciosPage() {
         que irá gerir toda a interatividade da página.
       */}
       <AdvertisementsClient
-        initialAdvertisements={advertisements}
+        initialAdvertisements={typedAdvertisements}
         companies={companies as Company[]}
       />
     </div>
