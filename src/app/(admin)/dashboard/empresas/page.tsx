@@ -1,9 +1,9 @@
 // src/app/(admin)/dashboard/empresas/page.tsx
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server"; // ATUALIZADO
 import { CompaniesClient } from "@/components/admin/companies/CompaniesClient";
 
 export default async function EmpresasPage() {
-  const supabase = createServerClient();
+  const supabase = createClient(); // ATUALIZADO
 
   const { data: companies, error } = await supabase
     .from("companies")
@@ -12,7 +12,6 @@ export default async function EmpresasPage() {
 
   if (error) {
     console.error("Erro ao buscar empresas:", error);
-    // Idealmente, mostrar um componente de erro aqui
   }
 
   return (

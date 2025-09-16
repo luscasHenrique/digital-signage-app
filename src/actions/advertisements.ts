@@ -1,7 +1,7 @@
 // src/actions/advertisements.ts
 "use server";
 
-import { createServerClient } from "@/lib/supabase/server";
+import { createActionClient } from "@/lib/supabase/server";
 import {
   AdvertisementStatus,
   AdvertisementType,
@@ -13,6 +13,7 @@ import { z } from "zod";
 // ESQUEMA DO SERVIDOR (ACTION SCHEMA)
 // Este esquema valida e converte (coage) os dados brutos do formulário
 // para os tipos corretos que o banco de dados espera.
+
 const actionSchema = z
   .object({
     id: z.string().optional(),
@@ -75,9 +76,9 @@ const actionSchema = z
     }
   );
 
-// Função auxiliar para fazer o upload do ficheiro e obter a sua URL pública.
+// Função auxiliar para fazer o upload do ficheiro
 async function uploadFileAndGetUrl(
-  supabase: ReturnType<typeof createServerClient>,
+  supabase: ReturnType<typeof createActionClient>, // ATUALIZADO
   file: File
 ) {
   const filePath = `public/${Date.now()}-${file.name.replace(/\s/g, "_")}`;
@@ -99,7 +100,8 @@ async function uploadFileAndGetUrl(
 
 // ACTION PARA CRIAR ANÚNCIO
 export async function createAdvertisement(formData: FormData) {
-  const supabase = createServerClient();
+  const supabase = createActionClient(); // ATUALIZADO
+  // ... o resto da sua função createAdvertisement permanece o mesmo
   const rawData = Object.fromEntries(formData.entries());
   const dataToValidate = {
     ...rawData,
@@ -142,7 +144,7 @@ export async function createAdvertisement(formData: FormData) {
     company_id,
   }));
   const { error: linkError } = await supabase
-    .from("advertisements_companies")
+    .from("advertisement_companies")
     .insert(links);
   if (linkError)
     return { success: false, message: { _server: [linkError.message] } };
@@ -153,7 +155,8 @@ export async function createAdvertisement(formData: FormData) {
 
 // ACTION PARA ATUALIZAR ANÚNCIO
 export async function updateAdvertisement(formData: FormData) {
-  const supabase = createServerClient();
+  const supabase = createActionClient(); // ATUALIZADO
+  // ... o resto da sua função updateAdvertisement permanece o mesmo
   const rawData = Object.fromEntries(formData.entries());
   const dataToValidate = {
     ...rawData,
@@ -178,7 +181,6 @@ export async function updateAdvertisement(formData: FormData) {
 
   try {
     if (content_file && content_file.size > 0) {
-      // Nota: A lógica para apagar o ficheiro antigo do storage não está aqui para simplificar.
       adData.content_url = await uploadFileAndGetUrl(supabase, content_file);
     }
   } catch (e: unknown) {
@@ -197,9 +199,8 @@ export async function updateAdvertisement(formData: FormData) {
   if (adError)
     return { success: false, message: { _server: [adError.message] } };
 
-  // Sincroniza os vínculos
   await supabase
-    .from("advertisements_companies")
+    .from("advertisement_companies")
     .delete()
     .eq("advertisement_id", id);
   const links = company_ids.map((company_id) => ({
@@ -207,7 +208,7 @@ export async function updateAdvertisement(formData: FormData) {
     company_id,
   }));
   const { error: linkError } = await supabase
-    .from("advertisements_companies")
+    .from("advertisement_companies")
     .insert(links);
   if (linkError)
     return { success: false, message: { _server: [linkError.message] } };
@@ -218,16 +219,11 @@ export async function updateAdvertisement(formData: FormData) {
 
 // ACTION PARA ELIMINAR ANÚNCIO
 export async function deleteAdvertisement(adId: string) {
-  const supabase = createServerClient();
+  const supabase = createActionClient(); // ATUALIZADO
   if (!adId) {
     return { success: false, message: "ID do anúncio não fornecido." };
   }
 
-  // Opcional: Deletar o ficheiro do storage antes de deletar o registo.
-  // Para isso, precisaríamos primeiro de buscar a content_url do anúncio.
-
-  // Graças ao 'ON DELETE CASCADE' na nossa tabela 'advertisements_companies',
-  // ao deletar o anúncio, os vínculos são removidos automaticamente.
   const { error } = await supabase
     .from("advertisements")
     .delete()

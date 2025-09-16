@@ -1,3 +1,4 @@
+// src/app/(admin)/dashboard/anuncios/page.tsx
 import { createClient } from "@/lib/supabase/server"; // PONTO 1: Importa a função correta
 import { AdvertisementsClient } from "@/components/admin/advertisements/AdvertisementsClient";
 import { Company } from "@/types";

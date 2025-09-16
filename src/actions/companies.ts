@@ -1,7 +1,6 @@
-// src/actions/companies.ts
 "use server";
 
-import { createServerClient } from "@/lib/supabase/server";
+import { createActionClient } from "@/lib/supabase/server"; // ATUALIZADO
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -23,7 +22,7 @@ type CompanyFormData = z.infer<typeof companySchema>;
 
 // Action para CRIAR uma nova empresa
 export async function createCompany(data: CompanyFormData) {
-  const supabase = createServerClient();
+  const supabase = createActionClient(); // ATUALIZADO
   const validation = companySchema.safeParse(data);
 
   if (!validation.success) {
@@ -45,7 +44,7 @@ export async function createCompany(data: CompanyFormData) {
 
 // Action para ATUALIZAR uma empresa
 export async function updateCompany(data: CompanyFormData) {
-  const supabase = createServerClient();
+  const supabase = createActionClient(); // ATUALIZADO
   const validation = companySchema.safeParse(data);
 
   if (!validation.success) {
@@ -80,7 +79,7 @@ export async function updateCompany(data: CompanyFormData) {
 
 // Action para DELETAR uma empresa
 export async function deleteCompany(companyId: string) {
-  const supabase = createServerClient();
+  const supabase = createActionClient(); // ATUALIZADO
   if (!companyId) {
     return { success: false, message: "ID da empresa não fornecido." };
   }
