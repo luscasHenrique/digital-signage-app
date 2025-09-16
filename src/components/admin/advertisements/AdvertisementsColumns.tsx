@@ -1,3 +1,4 @@
+// src/components/admin/advertisements/AdvertisementsColumns.tsx
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";

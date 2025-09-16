@@ -1,3 +1,4 @@
+// src/app/(admin)/layout.tsx
 import { createClient } from "@/lib/supabase/server"; // ATUALIZADO AQUI
 import { redirect } from "next/navigation";
 import { PropsWithChildren } from "react";
