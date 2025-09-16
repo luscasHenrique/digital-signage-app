@@ -17,6 +17,19 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "png.pngtree.com",
       },
+      {
+        // ADICIONE ESTE NOVO BLOCO
+        protocol: "https",
+        hostname: "encrypted-tbn2.gstatic.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.gstatic.com", // O '*' permite qualquer subdomínio
+      },
+      {
+        protocol: "https",
+        hostname: "**", // O '**' permite qualquer domínio
+      },
     ],
   },
 };
