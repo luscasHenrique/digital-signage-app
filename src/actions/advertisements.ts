@@ -11,22 +11,17 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 // ESQUEMA DO SERVIDOR (ACTION SCHEMA)
-// Este esquema valida e converte (coage) os dados brutos do formulário
-// para os tipos corretos que o banco de dados espera.
-
 const actionSchema = z
   .object({
     id: z.string().optional(),
     title: z.string().min(3, "O título é obrigatório."),
     description: z.string().optional(),
     type: z.nativeEnum(AdvertisementType),
-
-    // O conteúdo pode ser um ficheiro (para upload) ou uma URL (para link).
     content_file: z.instanceof(File).optional(),
     content_url: z.string().optional(),
-
-    start_date: z.coerce.date(),
-    end_date: z.coerce.date(),
+    // As datas agora são validadas como strings, que é o formato que enviaremos (ISOString)
+    start_date: z.string(),
+    end_date: z.string(),
     duration_seconds: z.coerce
       .number()
       .min(5, "A duração mínima é 5 segundos."),
@@ -39,7 +34,7 @@ const actionSchema = z
     overlay_bg_color: z.string().optional(),
     overlay_text_color: z.string().optional(),
   })
-  .refine((data) => data.end_date >= data.start_date, {
+  .refine((data) => new Date(data.end_date) >= new Date(data.start_date), {
     message: "A data final deve ser igual ou posterior à data inicial.",
     path: ["end_date"],
   })
@@ -76,97 +71,74 @@ const actionSchema = z
     }
   );
 
-// Função auxiliar para fazer o upload do ficheiro
-async function uploadFileAndGetUrl(
-  supabase: ReturnType<typeof createActionClient>, // ATUALIZADO
-  file: File
-) {
-  const filePath = `public/${Date.now()}-${file.name.replace(/\s/g, "_")}`;
-  const { error } = await supabase.storage
-    .from("advertisements")
-    .upload(filePath, file);
-
-  if (error) {
-    console.error("Supabase Upload Error:", error);
-    throw new Error("Falha no upload do ficheiro para o Supabase Storage.");
-  }
-
-  const { data: publicUrlData } = supabase.storage
-    .from("advertisements")
-    .getPublicUrl(filePath);
-
-  return publicUrlData.publicUrl;
-}
-
 // ACTION PARA CRIAR ANÚNCIO
-export async function createAdvertisement(formData: FormData) {
-  const supabase = createActionClient(); // ATUALIZADO
-  // ... o resto da sua função createAdvertisement permanece o mesmo
-  const rawData = Object.fromEntries(formData.entries());
-  const dataToValidate = {
-    ...rawData,
-    company_ids:
-      typeof rawData.company_ids === "string"
-        ? rawData.company_ids.split(",")
-        : [],
-  };
+// Agora ela recebe um objeto JSON, não mais um FormData
+export async function createAdvertisement(data: z.infer<typeof actionSchema>) {
+  const supabase = createActionClient();
+  const validation = actionSchema.safeParse(data);
 
-  const validation = actionSchema.safeParse(dataToValidate);
   if (!validation.success) {
     return { success: false, message: validation.error.flatten().fieldErrors };
   }
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user)
+    return { success: false, message: { _server: ["Não autenticado"] } };
+
   const { company_ids, content_file, ...adData } = validation.data;
 
   try {
-    if (content_file && content_file.size > 0) {
-      adData.content_url = await uploadFileAndGetUrl(supabase, content_file);
+    // Passo 1: Inserir o anúncio e tentar selecionar o ID de volta
+    const { data: newAdArray, error: adError } = await supabase
+      .from("advertisements")
+      .insert({ ...adData, created_by: user.id })
+      .select("id"); // Removido .single() para mais resiliência
+
+    // Se houver um erro direto do banco, ele será capturado pelo 'catch'
+    if (adError) throw adError;
+
+    // Verifica se o insert retornou o ID. Se não, é provável ser um problema de RLS.
+    const newAd = newAdArray?.[0];
+    if (!newAd) {
+      throw new Error(
+        "Falha ao obter o ID do anúncio recém-criado. Verifique as políticas de RLS (SELECT) na tabela 'advertisements'."
+      );
     }
-  } catch (e: unknown) {
+
+    // Passo 2: Associar as empresas na tabela de junção
+    const associations = company_ids.map((company_id) => ({
+      advertisement_id: newAd.id,
+      company_id: company_id,
+    }));
+
+    const { error: assocError } = await supabase
+      .from("advertisements_companies")
+      .insert(associations);
+
+    // Se houver um erro na associação, ele será capturado pelo 'catch'
+    if (assocError) throw assocError;
+
+    revalidatePath("/dashboard/anuncios");
+    return { success: true, message: "Anúncio criado com sucesso!" };
+  } catch (error) {
+    // Log detalhado no CONSOLE DO SERVIDOR (terminal) para depuração
+    console.error("ERRO DETALHADO AO CRIAR ANÚNCIO:", error);
+
     const errorMessage =
-      e instanceof Error ? e.message : "Ocorreu um erro desconhecido.";
+      error instanceof Error ? error.message : "Erro desconhecido.";
     return {
       success: false,
-      message: { _server: [`Erro no upload: ${errorMessage}`] },
+      message: { _server: [`Falha ao criar anúncio: ${errorMessage}`] },
     };
   }
-
-  const { data: newAd, error: adError } = await supabase
-    .from("advertisements")
-    .insert(adData)
-    .select("id")
-    .single();
-  if (adError)
-    return { success: false, message: { _server: [adError.message] } };
-
-  const links = company_ids.map((company_id) => ({
-    advertisement_id: newAd.id,
-    company_id,
-  }));
-  const { error: linkError } = await supabase
-    .from("advertisement_companies")
-    .insert(links);
-  if (linkError)
-    return { success: false, message: { _server: [linkError.message] } };
-
-  revalidatePath("/dashboard/anuncios");
-  return { success: true, message: "Anúncio criado com sucesso!" };
 }
-
 // ACTION PARA ATUALIZAR ANÚNCIO
-export async function updateAdvertisement(formData: FormData) {
-  const supabase = createActionClient(); // ATUALIZADO
-  // ... o resto da sua função updateAdvertisement permanece o mesmo
-  const rawData = Object.fromEntries(formData.entries());
-  const dataToValidate = {
-    ...rawData,
-    company_ids:
-      typeof rawData.company_ids === "string"
-        ? rawData.company_ids.split(",")
-        : [],
-  };
+export async function updateAdvertisement(data: z.infer<typeof actionSchema>) {
+  const supabase = createActionClient();
+  const validation = actionSchema.safeParse(data);
 
-  const validation = actionSchema.safeParse(dataToValidate);
   if (!validation.success) {
     return { success: false, message: validation.error.flatten().fieldErrors };
   }
@@ -179,39 +151,36 @@ export async function updateAdvertisement(formData: FormData) {
     };
   }
 
-  try {
-    if (content_file && content_file.size > 0) {
-      adData.content_url = await uploadFileAndGetUrl(supabase, content_file);
-    }
-  } catch (e: unknown) {
-    const errorMessage =
-      e instanceof Error ? e.message : "Ocorreu um erro desconhecido.";
-    return {
-      success: false,
-      message: { _server: [`Erro no upload: ${errorMessage}`] },
-    };
-  }
+  // A lógica de upload de arquivo já acontece no formulário antes de chamar esta action.
+  // A 'adData' já contém a 'content_url' correta, seja a antiga ou a nova.
 
   const { error: adError } = await supabase
     .from("advertisements")
     .update(adData)
     .eq("id", id);
-  if (adError)
-    return { success: false, message: { _server: [adError.message] } };
 
+  if (adError) {
+    return { success: false, message: { _server: [adError.message] } };
+  }
+
+  // Sincroniza os vínculos com as empresas (deleta os antigos e insere os novos)
   await supabase
-    .from("advertisement_companies")
+    .from("advertisements_companies")
     .delete()
     .eq("advertisement_id", id);
+
   const links = company_ids.map((company_id) => ({
     advertisement_id: id,
     company_id,
   }));
+
   const { error: linkError } = await supabase
-    .from("advertisement_companies")
+    .from("advertisements_companies")
     .insert(links);
-  if (linkError)
+
+  if (linkError) {
     return { success: false, message: { _server: [linkError.message] } };
+  }
 
   revalidatePath("/dashboard/anuncios");
   return { success: true, message: "Anúncio atualizado com sucesso!" };
@@ -235,4 +204,45 @@ export async function deleteAdvertisement(adId: string) {
 
   revalidatePath("/dashboard/anuncios");
   return { success: true, message: "Anúncio deletado com sucesso!" };
+}
+
+// NOVA ACTION: Para gerar a URL de Upload Segura
+export async function getSignedUploadUrl({
+  fileName,
+  fileType,
+}: {
+  fileName: string;
+  fileType: string;
+}) {
+  const supabase = createActionClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, message: "Não autenticado." };
+  }
+
+  // Cria um nome de arquivo único para evitar conflitos de nomes iguais
+  const path = `${user.id}/${Date.now()}-${fileName.replace(/\s/g, "_")}`;
+
+  try {
+    const { data, error } = await supabase.storage
+      .from("advertisements") // VERIFIQUE: Este é o nome do seu bucket no Supabase?
+      .createSignedUploadUrl(path);
+
+    if (error) throw error;
+
+    // Retorna a URL assinada (para onde o arquivo será enviado) e o 'path' (para construir a URL pública depois)
+    return {
+      success: true,
+      message: "URL gerada com sucesso.",
+      data: { url: data.signedUrl, path },
+    };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Erro desconhecido.";
+    console.error("Erro ao gerar URL de upload:", errorMessage);
+    return { success: false, message: "Falha ao gerar URL de upload." };
+  }
 }
