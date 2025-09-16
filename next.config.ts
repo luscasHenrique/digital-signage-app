@@ -6,11 +6,16 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "pbwpybwviymcxvdmqplv.supabase.co", // seu hostname do supabase
+        hostname: "pbwpybwviymcxvdmqplv.supabase.co",
       },
       {
         protocol: "https",
-        hostname: "i.ytimg.com", // NOVO: Hostname para thumbnails do YouTube
+        hostname: "i.ytimg.com",
+      },
+      {
+        // ADICIONE ESTE BLOCO
+        protocol: "https",
+        hostname: "png.pngtree.com",
       },
     ],
   },

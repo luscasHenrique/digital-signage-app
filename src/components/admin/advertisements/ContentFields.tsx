@@ -1,4 +1,3 @@
-// src/components/admin/advertisements/ContentFields.tsx
 "use client";
 
 import {
@@ -9,44 +8,15 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  AdvertisementType,
-  AdvertisementStatus,
-  OverlayPosition,
-} from "@/types"; // Importa os Enums
+import { AdvertisementType } from "@/types";
 import { UseFormReturn } from "react-hook-form";
-import { z } from "zod"; // Importa o Zod
 
-// Definimos o schema aqui para que o componente conheça a estrutura do formulário
-// ATENÇÃO: Este schema deve ser IDÊNTICO ao que está no AdvertisementForm.tsx
-const formSchema = z.object({
-  id: z.string().optional(),
-  title: z.string().min(3, "O título é obrigatório."),
-  description: z.string().optional(),
-  type: z.nativeEnum(AdvertisementType),
-  content_file: z.any().optional(),
-  content_url: z.string().optional(),
-  start_date: z.date(),
-  end_date: z.date(),
-  duration_seconds: z
-    .string()
-    .refine(
-      (val) => !isNaN(Number(val)) && Number(val) >= 5,
-      "A duração mínima é 5 segundos."
-    ),
-  status: z.nativeEnum(AdvertisementStatus),
-  company_ids: z.array(z.string()).min(1, "Selecione ao menos uma empresa."),
-  overlay_text: z.string().optional(),
-  overlay_position: z.nativeEnum(OverlayPosition).optional(),
-  overlay_bg_color: z.string().optional(),
-  overlay_text_color: z.string().optional(),
-});
+// ATUALIZADO: Importamos o tipo centralizado do nosso novo arquivo de schemas
+import { AdvertisementFormSchemaData } from "@/lib/schemas";
 
-type FormSchemaData = z.infer<typeof formSchema>;
-
-// A interface agora usa o tipo específico do formulário
+// A interface agora usa o tipo importado, que é a fonte única da verdade
 interface ContentFieldsProps {
-  form: UseFormReturn<FormSchemaData>;
+  form: UseFormReturn<AdvertisementFormSchemaData>;
   adType: AdvertisementType | undefined;
 }
 
@@ -86,8 +56,9 @@ export function ContentFields({ form, adType }: ContentFieldsProps) {
                 accept={
                   adType === AdvertisementType.IMAGE_UPLOAD
                     ? "image/*"
-                    : `video/mp4,video/webm` // <-- ERRO DE DIGITAÇÃO CORRIGIDO
+                    : `video/mp4,video/webm`
                 }
+                // Ajuste para garantir que o 'value' seja limpo ao selecionar um arquivo
                 onChange={(e) => field.onChange(e.target.files)}
               />
             </FormControl>
@@ -98,5 +69,5 @@ export function ContentFields({ form, adType }: ContentFieldsProps) {
     );
   }
 
-  return null;
+  return null; // Não mostra nada se nenhum tipo for selecionado
 }

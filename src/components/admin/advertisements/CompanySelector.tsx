@@ -1,4 +1,3 @@
-// src/components/admin/advertisements/CompanySelector.tsx
 "use client";
 
 import { Check, ChevronsUpDown } from "lucide-react";
@@ -23,46 +22,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Company,
-  AdvertisementType,
-  AdvertisementStatus,
-  OverlayPosition,
-} from "@/types";
+import { Company } from "@/types";
 import { ControllerRenderProps } from "react-hook-form";
-import { z } from "zod";
 
-// Para reutilizar, vamos definir o schema do formulário em um local acessível
-// Pode ser neste arquivo ou em um arquivo separado de schemas.
-// ATENÇÃO: Este schema deve ser IDÊNTICO ao que está no AdvertisementForm.tsx
-const formSchema = z.object({
-  id: z.string().optional(),
-  title: z.string().min(3, "O título é obrigatório."),
-  description: z.string().optional(),
-  type: z.nativeEnum(AdvertisementType),
-  content_file: z.any().optional(),
-  content_url: z.string().optional(),
-  start_date: z.date(),
-  end_date: z.date(),
-  duration_seconds: z
-    .string()
-    .refine(
-      (val) => !isNaN(Number(val)) && Number(val) >= 5,
-      "A duração mínima é 5 segundos."
-    ),
-  status: z.nativeEnum(AdvertisementStatus),
-  company_ids: z.array(z.string()).min(1, "Selecione ao menos uma empresa."),
-  overlay_text: z.string().optional(),
-  overlay_position: z.nativeEnum(OverlayPosition).optional(),
-  overlay_bg_color: z.string().optional(),
-  overlay_text_color: z.string().optional(),
-});
+// ATUALIZADO: Importamos apenas os tipos que realmente usamos
+import { AdvertisementFormSchemaData } from "@/lib/schemas";
 
-type FormSchemaData = z.infer<typeof formSchema>;
-
-// A interface agora usa o tipo inferido do nosso schema
+// A interface agora usa o tipo importado, resolvendo qualquer incompatibilidade
 interface CompanySelectorProps {
-  field: ControllerRenderProps<FormSchemaData, "company_ids">;
+  field: ControllerRenderProps<AdvertisementFormSchemaData, "company_ids">;
   companies: Company[];
 }
 

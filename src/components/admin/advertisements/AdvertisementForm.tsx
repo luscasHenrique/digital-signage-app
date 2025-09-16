@@ -1,10 +1,8 @@
-// src/components/admin/advertisements/AdvertisementForm.tsx
 "use client";
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -22,6 +20,12 @@ import {
   updateAdvertisement,
 } from "@/actions/advertisements";
 import { AdvertisementWithCompanies } from "./AdvertisementsClient";
+
+// Importa o schema e o tipo do nosso arquivo centralizado
+import {
+  advertisementFormSchema,
+  AdvertisementFormSchemaData,
+} from "@/lib/schemas";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -50,78 +54,9 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
+// Importa os subcomponentes
 import { CompanySelector } from "./CompanySelector";
 import { ContentFields } from "./ContentFields";
-
-// Schema Zod corrigido (removido 'required_error')
-const formSchema = z
-  .object({
-    id: z.string().optional(),
-    title: z.string().min(3, "O título é obrigatório."),
-    description: z.string().optional(),
-    // CORRIGIDO: Removida a opção inválida 'required_error'
-    type: z.nativeEnum(AdvertisementType),
-    content_file: z.any().optional(),
-    content_url: z.string().optional(),
-    start_date: z.date(),
-    end_date: z.date(),
-    duration_seconds: z
-      .string()
-      .refine(
-        (val) => !isNaN(Number(val)) && Number(val) >= 5,
-        "A duração mínima é 5 segundos."
-      ),
-    status: z.nativeEnum(AdvertisementStatus),
-    company_ids: z.array(z.string()).min(1, "Selecione ao menos uma empresa."),
-    overlay_text: z.string().optional(),
-    overlay_position: z.nativeEnum(OverlayPosition).optional(),
-    overlay_bg_color: z.string().optional(),
-    overlay_text_color: z.string().optional(),
-  })
-  .refine(
-    (data) => {
-      if (data.start_date && data.end_date) {
-        return data.end_date >= data.start_date;
-      }
-      return true;
-    },
-    {
-      message: "A data final deve ser igual ou posterior à data inicial.",
-      path: ["end_date"],
-    }
-  )
-  .refine(
-    (data) => {
-      const isUpload =
-        data.type === AdvertisementType.IMAGE_UPLOAD ||
-        data.type === AdvertisementType.VIDEO_UPLOAD;
-      const isLink =
-        data.type === AdvertisementType.IMAGE_LINK ||
-        data.type === AdvertisementType.VIDEO_LINK ||
-        data.type === AdvertisementType.EMBED_LINK;
-
-      if (isLink)
-        return (
-          !!data.content_url &&
-          z.string().url().safeParse(data.content_url).success
-        );
-      if (isUpload)
-        return (
-          (data.content_file instanceof FileList &&
-            data.content_file.length > 0) ||
-          !!data.content_url
-        );
-
-      return false;
-    },
-    {
-      message:
-        "Um arquivo (para Upload) ou uma URL válida (para Link) é obrigatório.",
-      path: ["content_url"],
-    }
-  );
-
-type FormSchemaData = z.infer<typeof formSchema>;
 
 interface AdvertisementFormProps {
   initialData: AdvertisementWithCompanies | null;
@@ -137,20 +72,18 @@ export function AdvertisementForm({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  const form = useForm<FormSchemaData>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<AdvertisementFormSchemaData>({
+    resolver: zodResolver(advertisementFormSchema),
     defaultValues: {
       id: initialData?.id || undefined,
       title: initialData?.title || "",
       description: initialData?.description || "",
-      type: initialData?.type || undefined,
+      type: initialData?.type,
       content_url: initialData?.content_url || "",
       start_date: initialData?.start_date
         ? new Date(initialData.start_date)
-        : undefined,
-      end_date: initialData?.end_date
-        ? new Date(initialData.end_date)
-        : undefined,
+        : null,
+      end_date: initialData?.end_date ? new Date(initialData.end_date) : null,
       duration_seconds: String(initialData?.duration_seconds || 15),
       status: initialData?.status || AdvertisementStatus.ACTIVE,
       company_ids: initialData?.companies.map((c) => c.id) || [],
@@ -164,7 +97,14 @@ export function AdvertisementForm({
   const adType = form.watch("type");
   const overlayText = form.watch("overlay_text");
 
-  const onSubmit = async (data: FormSchemaData) => {
+  const onSubmit = async (data: AdvertisementFormSchemaData) => {
+    if (!data.start_date || !data.end_date || !data.type) {
+      toast.error(
+        "Por favor, preencha todos os campos obrigatórios (Tipo, Data de Início, Data de Fim)."
+      );
+      return;
+    }
+
     let finalContentUrl = data.content_url;
     const file = data.content_file?.[0];
 
@@ -175,52 +115,45 @@ export function AdvertisementForm({
     if (isUpload && file) {
       setIsUploading(true);
       setUploadProgress(10);
-
       const signedUrlResult = await getSignedUploadUrl({
         fileName: file.name,
         fileType: file.type,
       });
-
       if (!signedUrlResult.success || !signedUrlResult.data) {
         toast.error(signedUrlResult.message);
         setIsUploading(false);
         return;
       }
-
       const { url, path } = signedUrlResult.data;
       setUploadProgress(50);
-
       const uploadResponse = await fetch(url, {
         method: "PUT",
         body: file,
         headers: { "Content-Type": file.type },
       });
-
       if (!uploadResponse.ok) {
         toast.error("Falha no upload do arquivo.");
         setIsUploading(false);
         return;
       }
-
       setUploadProgress(100);
-
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const bucketName = "advertisements";
       finalContentUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${path}`;
     }
 
-    // Prepara os dados com os tipos corretos para a action
     const finalData = {
       ...data,
       content_url: finalContentUrl,
-      start_date: data.start_date.toISOString(), // Converte Date para string
-      end_date: data.end_date.toISOString(), // Converte Date para string
-      duration_seconds: Number(data.duration_seconds), // Converte string para number
-      content_file: undefined, // Remove o arquivo do objeto final
+      start_date: data.start_date.toISOString(),
+      end_date: data.end_date.toISOString(),
+      duration_seconds: Number(data.duration_seconds),
+      content_file: undefined,
+      type: data.type,
     };
 
     const action = initialData ? updateAdvertisement : createAdvertisement;
-    const result = await action(finalData); // Removido 'as any'
+    const result = await action(finalData);
 
     setIsUploading(false);
 
@@ -232,7 +165,7 @@ export function AdvertisementForm({
         Object.entries(result.message).forEach(([key, value]) => {
           if (key === "_server") toast.error((value as string[]).join(", "));
           else
-            form.setError(key as keyof FormSchemaData, {
+            form.setError(key as keyof AdvertisementFormSchemaData, {
               message: (value as string[]).join(", "),
             });
         });
@@ -303,6 +236,7 @@ export function AdvertisementForm({
             />
 
             <ContentFields form={form} adType={adType} />
+
             {isUploading && (
               <div className="flex items-center gap-2 pt-2">
                 <Progress value={uploadProgress} className="w-full" />
@@ -354,7 +288,7 @@ export function AdvertisementForm({
                       <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
-                          selected={field.value}
+                          selected={field.value ?? undefined} // CORREÇÃO AQUI
                           onSelect={field.onChange}
                           initialFocus
                         />
@@ -390,7 +324,7 @@ export function AdvertisementForm({
                       <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
-                          selected={field.value}
+                          selected={field.value ?? undefined} // CORREÇÃO AQUI
                           onSelect={field.onChange}
                           initialFocus
                         />
