@@ -223,10 +223,10 @@ export function AdvertisementForm({
                         Link de Imagem
                       </SelectItem>
                       <SelectItem value={AdvertisementType.VIDEO_LINK}>
-                        Link de Vídeo
+                        Link de Vídeo .MP4
                       </SelectItem>
                       <SelectItem value={AdvertisementType.EMBED_LINK}>
-                        Link de Incorporação
+                        Link de Incorporação (Embed)
                       </SelectItem>
                     </SelectContent>
                   </Select>
