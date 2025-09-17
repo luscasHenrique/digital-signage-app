@@ -1,7 +1,8 @@
 // src/actions/companies.ts
 "use server";
-
-import { createActionClient } from "@/lib/supabase/server";
+import { SignJWT } from "jose";
+import { cookies } from "next/headers";
+import { createActionClient, createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -124,6 +125,69 @@ export async function deleteCompany(companyId: string) {
     return { success: true, message: "Empresa deletada com sucesso!" };
   } catch (error) {
     console.error("ERRO AO DELETAR EMPRESA:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Erro desconhecido.";
+    return { success: false, message: errorMessage };
+  }
+}
+
+const verifyPasswordSchema = z.object({
+  slug: z.string(),
+  password: z.string().min(1, "A senha é obrigatória."),
+});
+
+export async function verifyCompanyPassword(
+  data: z.infer<typeof verifyPasswordSchema>
+) {
+  const validation = verifyPasswordSchema.safeParse(data);
+  if (!validation.success) {
+    return { success: false, message: "Dados inválidos." };
+  }
+
+  const { slug, password } = validation.data;
+
+  // Usamos createClient pois a primeira parte é apenas leitura
+  const supabase = createClient();
+
+  try {
+    const { data: company, error } = await supabase
+      .from("companies")
+      .select("password")
+      .eq("slug", slug)
+      .eq("is_private", true)
+      .single();
+
+    if (error || !company) {
+      throw new Error("Empresa não encontrada ou não é privada.");
+    }
+
+    if (company.password !== password) {
+      return { success: false, message: "Senha incorreta." };
+    }
+
+    // --- LÓGICA DE CRIAÇÃO DO TOKEN E COOKIE ---
+
+    // 1. Cria o token de acesso (JWT)
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET_KEY!);
+    const token = await new SignJWT({ slug: slug })
+      .setProtectedHeader({ alg: "HS256" })
+      .setSubject("company-access")
+      .setIssuedAt()
+      .setExpirationTime("1h") // Token válido por 1 hora
+      .sign(secret);
+
+    // 2. Salva o token em um cookie
+    // CORREÇÃO APLICADA AQUI
+    (await cookies()).set(`access_token_${slug}`, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60, // 1 hora em segundos
+    });
+
+    return { success: true, message: "Acesso concedido." };
+  } catch (error) {
+    console.error("Erro ao verificar senha da empresa:", error);
     const errorMessage =
       error instanceof Error ? error.message : "Erro desconhecido.";
     return { success: false, message: errorMessage };
