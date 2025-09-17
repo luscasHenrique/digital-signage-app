@@ -1,19 +1,44 @@
-// src/components/display/CompanyDisplay.tsx
 "use client";
 
 import { Advertisement, AdvertisementType, OverlayPosition } from "@/types";
 import Image from "next/image";
 import { useEffect, useState, useRef } from "react";
+// ATUALIZADO: Importa 'motion', 'AnimatePresence', e o tipo 'Variants'
+import { motion, AnimatePresence, Variants, Transition } from "framer-motion";
 
-// Tipagem para as propriedades que o componente receberá
+// ATUALIZADO: Presets de animação agora são tipados com 'Variants'
+const animationPresets: Record<string, Variants> = {
+  fade: {
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
+  },
+  slideFromRight: {
+    initial: { x: "100%", opacity: 0 },
+    animate: { x: 0, opacity: 1 },
+    exit: { x: "-100%", opacity: 0 },
+  },
+  zoomIn: {
+    initial: { scale: 0.5, opacity: 0 },
+    animate: { scale: 1, opacity: 1 },
+    exit: { scale: 0.5, opacity: 0 },
+  },
+};
+
+// ATUALIZADO: Objeto separado para as propriedades de transição
+const transitionSettings: Record<string, Transition> = {
+  fade: { duration: 1.5 },
+  slideFromRight: { duration: 1, ease: "easeInOut" },
+  zoomIn: { duration: 1 },
+};
+
+type AnimationType = keyof typeof animationPresets;
+
 interface CompanyDisplayProps {
   ads: Advertisement[];
+  animationType?: AnimationType;
 }
 
-/**
- * Função auxiliar para gerar a URL de embed correta para o YouTube,
- * otimizada para digital signage (autoplay, sem som, sem controles, em loop).
- */
 function getYoutubeEmbedUrl(url: string): string | null {
   try {
     const urlObj = new URL(url);
@@ -26,7 +51,6 @@ function getYoutubeEmbedUrl(url: string): string | null {
     ) {
       videoId = urlObj.searchParams.get("v");
     }
-    // Parâmetros otimizados para exibição contínua
     return videoId
       ? `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0&rel=0`
       : null;
@@ -35,43 +59,34 @@ function getYoutubeEmbedUrl(url: string): string | null {
   }
 }
 
-export function CompanyDisplay({ ads }: CompanyDisplayProps) {
-  // --- GERENCIAMENTO DE ESTADO ---
-  const [currentIndex, setCurrentIndex] = useState(0); // Controla qual anúncio está na tela
-  const [now, setNow] = useState(new Date()); // Controla o relógio
-  const videoRef = useRef<HTMLVideoElement>(null); // Referência para controlar vídeos de upload
+export function CompanyDisplay({
+  ads,
+  animationType = "fade",
+}: CompanyDisplayProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [now, setNow] = useState(new Date());
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Pega o anúncio atual da lista
   const currentAd = ads[currentIndex];
+  // Pega os presets corretos com base na prop
+  const selectedAnimation = animationPresets[animationType];
+  const selectedTransition = transitionSettings[animationType];
 
-  // --- LÓGICA DE EFEITOS ---
-
-  // Efeito #1: O Relógio
-  // Roda um timer para atualizar a data e a hora a cada segundo.
+  // --- LÓGICA DE EFEITOS (sem alterações) ---
   useEffect(() => {
     const clockTimer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(clockTimer); // Limpa o timer ao sair da página
+    return () => clearInterval(clockTimer);
   }, []);
 
-  // Efeito #2: A Playlist (Slideshow)
-  // Roda um timer para avançar para o próximo anúncio.
   useEffect(() => {
-    // Não precisa de timer se houver apenas um anúncio
     if (ads.length <= 1) return;
-
-    // Pega a duração do anúncio atual (em milissegundos), ou usa 10s como padrão.
     const duration = (currentAd?.duration_seconds || 10) * 1000;
-
     const slideshowTimer = setTimeout(() => {
-      // Avança para o próximo índice, voltando a 0 se chegar ao fim da lista
       setCurrentIndex((prevIndex) => (prevIndex + 1) % ads.length);
     }, duration);
-
-    return () => clearTimeout(slideshowTimer); // Limpa o timer ao trocar de anúncio
+    return () => clearTimeout(slideshowTimer);
   }, [currentIndex, currentAd, ads.length]);
 
-  // Efeito #3: Autoplay para Vídeos de Upload
-  // Garante que vídeos de upload direto comecem a tocar.
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current
@@ -80,12 +95,9 @@ export function CompanyDisplay({ ads }: CompanyDisplayProps) {
     }
   }, [currentAd]);
 
-  // --- RENDERIZAÇÃO DO CONTEÚDO ---
-
-  // Função que decide o que renderizar (imagem, vídeo, etc.)
+  // --- RENDERIZAÇÃO DO CONTEÚDO (sem alterações) ---
   const renderAdContent = () => {
     if (!currentAd) {
-      // Fallback caso não haja anúncio
       return <div className="text-white">Carregando anúncio...</div>;
     }
 
@@ -97,8 +109,8 @@ export function CompanyDisplay({ ads }: CompanyDisplayProps) {
             src={currentAd.content_url}
             alt={currentAd.title}
             fill
-            className="object-cover" // 'cover' para preencher a tela inteira
-            priority // Otimiza o carregamento da imagem principal
+            className="object-cover"
+            priority
           />
         );
 
@@ -107,12 +119,12 @@ export function CompanyDisplay({ ads }: CompanyDisplayProps) {
         return (
           <video
             ref={videoRef}
-            key={currentAd.id} // Força o elemento a ser recriado ao mudar o vídeo
+            key={currentAd.id}
             src={currentAd.content_url}
             muted
             autoPlay
             loop
-            playsInline // Essencial para autoplay em alguns navegadores móveis
+            playsInline
             className="w-full h-full object-cover"
           />
         );
@@ -131,7 +143,6 @@ export function CompanyDisplay({ ads }: CompanyDisplayProps) {
             ></iframe>
           );
         }
-        // Fallback se a URL for inválida
         return (
           <div className="text-white">Preview indisponível para este link.</div>
         );
@@ -143,10 +154,21 @@ export function CompanyDisplay({ ads }: CompanyDisplayProps) {
 
   return (
     <main className="h-screen w-screen bg-black relative overflow-hidden text-white">
-      {/* Camada 1: O Conteúdo Principal */}
-      <div className="absolute inset-0 z-0">{renderAdContent()}</div>
+      <AnimatePresence>
+        <motion.div
+          key={currentAd?.id}
+          className="absolute inset-0 z-0"
+          // ATUALIZADO: Usa as props 'variants' e 'transition'
+          variants={selectedAnimation}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          transition={selectedTransition}
+        >
+          {renderAdContent()}
+        </motion.div>
+      </AnimatePresence>
 
-      {/* Camada 2: O Overlay (Aviso) */}
       {currentAd?.overlay_text && (
         <div
           className={`absolute w-full p-4 text-center text-2xl font-bold z-10
@@ -154,8 +176,7 @@ export function CompanyDisplay({ ads }: CompanyDisplayProps) {
               currentAd.overlay_position === OverlayPosition.TOP
                 ? "top-0"
                 : "bottom-0"
-            }
-          `}
+            }`}
           style={{
             backgroundColor: currentAd.overlay_bg_color || "rgba(0,0,0,0.5)",
             color: currentAd.overlay_text_color || "white",
@@ -165,7 +186,6 @@ export function CompanyDisplay({ ads }: CompanyDisplayProps) {
         </div>
       )}
 
-      {/* Camada 3: O Relógio e a Data */}
       <div className="absolute top-5 right-5 bg-black/50 p-3 rounded-lg text-center z-20">
         <div className="text-4xl font-bold">
           {now.toLocaleTimeString("pt-BR", {

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
+import { RgbaColorPicker } from "@/components/ui/RgbaColorPicker";
 
 import {
   AdvertisementStatus,
@@ -176,22 +177,21 @@ export function AdvertisementForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-6">
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Título</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
+        <div className="grid grid-cols-1  gap-6">
+          <FormField
+            control={form.control}
+            name="title"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Título</FormLabel>
+                <FormControl>
+                  <Input {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <div className="grid grid-cols-2  gap-6">
             <FormField
               control={form.control}
               name="type"
@@ -245,7 +245,6 @@ export function AdvertisementForm({
                 </span>
               </div>
             )}
-
             <FormField
               control={form.control}
               name="duration_seconds"
@@ -260,91 +259,38 @@ export function AdvertisementForm({
               )}
             />
           </div>
-
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="start_date"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Data de Início</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className="w-full justify-start text-left font-normal"
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP", { locale: ptBR })
-                            ) : (
-                              <span>Escolha uma data</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value ?? undefined} // CORREÇÃO AQUI
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="end_date"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Data de Fim</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className="w-full justify-start text-left font-normal"
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP", { locale: ptBR })
-                            ) : (
-                              <span>Escolha uma data</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value ?? undefined} // CORREÇÃO AQUI
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
+          <div className="grid grid-cols-2  gap-6">
             <FormField
               control={form.control}
-              name="description"
+              name="start_date"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Descrição (Opcional)</FormLabel>
-                  <FormControl>
-                    <Textarea {...field} />
-                  </FormControl>
+                <FormItem className="flex flex-col">
+                  <FormLabel>Data de Início</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                        >
+                          {field.value ? (
+                            format(field.value, "PPP", { locale: ptBR })
+                          ) : (
+                            <span>Escolha uma data</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value ?? undefined} // CORREÇÃO AQUI
+                        onSelect={field.onChange}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                   <FormMessage />
                 </FormItem>
               )}
@@ -352,12 +298,61 @@ export function AdvertisementForm({
 
             <FormField
               control={form.control}
-              name="company_ids"
+              name="end_date"
               render={({ field }) => (
-                <CompanySelector field={field} companies={companies} />
+                <FormItem className="flex flex-col">
+                  <FormLabel>Data de Fim</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                        >
+                          {field.value ? (
+                            format(field.value, "PPP", { locale: ptBR })
+                          ) : (
+                            <span>Escolha uma data</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value ?? undefined} // CORREÇÃO AQUI
+                        onSelect={field.onChange}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
               )}
             />
           </div>
+
+          <FormField
+            control={form.control}
+            name="company_ids"
+            render={({ field }) => (
+              <CompanySelector field={field} companies={companies} />
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Descrição (Opcional)</FormLabel>
+                <FormControl>
+                  <Textarea {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
 
         <div className="space-y-4 rounded-lg border p-4">
@@ -408,6 +403,7 @@ export function AdvertisementForm({
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={form.control}
                 name="overlay_bg_color"
@@ -415,7 +411,7 @@ export function AdvertisementForm({
                   <FormItem>
                     <FormLabel>Cor do Fundo</FormLabel>
                     <FormControl>
-                      <Input type="color" {...field} className="h-10 p-1" />
+                      <RgbaColorPicker field={field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -426,9 +422,9 @@ export function AdvertisementForm({
                 name="overlay_text_color"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cor do Texto</FormLabel>
+                    <FormLabel>Cor do Texto </FormLabel>
                     <FormControl>
-                      <Input type="color" {...field} className="h-10 p-1" />
+                      <RgbaColorPicker field={field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

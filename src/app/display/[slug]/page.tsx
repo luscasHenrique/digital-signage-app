@@ -49,5 +49,5 @@ export default async function DisplayPage({ params }: DisplayPageProps) {
     );
   }
 
-  return <CompanyDisplay ads={ads} />;
+  return <CompanyDisplay ads={ads} animationType="slideFromRight" />;
 }
