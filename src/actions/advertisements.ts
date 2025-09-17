@@ -143,6 +143,14 @@ export async function updateAdvertisement(data: z.infer<typeof actionSchema>) {
     return { success: false, message: validation.error.flatten().fieldErrors };
   }
 
+  // Adicionada verificação de usuário
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { success: false, message: { _server: ["Não autenticado"] } };
+  }
+
   const { id, company_ids, content_file, ...adData } = validation.data;
   if (!id) {
     return {
@@ -151,59 +159,80 @@ export async function updateAdvertisement(data: z.infer<typeof actionSchema>) {
     };
   }
 
-  // A lógica de upload de arquivo já acontece no formulário antes de chamar esta action.
-  // A 'adData' já contém a 'content_url' correta, seja a antiga ou a nova.
+  // Adicionado bloco try...catch para capturar erros do banco de dados
+  try {
+    const { error: adError } = await supabase
+      .from("advertisements")
+      .update({ ...adData, last_edited_by: user.id }) // Opcional: registrar quem editou
+      .eq("id", id);
 
-  const { error: adError } = await supabase
-    .from("advertisements")
-    .update(adData)
-    .eq("id", id);
+    if (adError) throw adError;
 
-  if (adError) {
-    return { success: false, message: { _server: [adError.message] } };
+    // Sincroniza os vínculos com as empresas (deleta os antigos e insere os novos)
+    const { error: deleteLinkError } = await supabase
+      .from("advertisements_companies")
+      .delete()
+      .eq("advertisement_id", id);
+
+    if (deleteLinkError) throw deleteLinkError;
+
+    const links = company_ids.map((company_id) => ({
+      advertisement_id: id,
+      company_id,
+    }));
+
+    const { error: insertLinkError } = await supabase
+      .from("advertisements_companies")
+      .insert(links);
+
+    if (insertLinkError) throw insertLinkError;
+
+    revalidatePath("/dashboard/anuncios");
+    return { success: true, message: "Anúncio atualizado com sucesso!" };
+  } catch (error) {
+    console.error("ERRO DETALHADO AO ATUALIZAR ANÚNCIO:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Erro desconhecido.";
+    return {
+      success: false,
+      message: { _server: [`Falha ao atualizar anúncio: ${errorMessage}`] },
+    };
   }
-
-  // Sincroniza os vínculos com as empresas (deleta os antigos e insere os novos)
-  await supabase
-    .from("advertisements_companies")
-    .delete()
-    .eq("advertisement_id", id);
-
-  const links = company_ids.map((company_id) => ({
-    advertisement_id: id,
-    company_id,
-  }));
-
-  const { error: linkError } = await supabase
-    .from("advertisements_companies")
-    .insert(links);
-
-  if (linkError) {
-    return { success: false, message: { _server: [linkError.message] } };
-  }
-
-  revalidatePath("/dashboard/anuncios");
-  return { success: true, message: "Anúncio atualizado com sucesso!" };
 }
 
 // ACTION PARA ELIMINAR ANÚNCIO
 export async function deleteAdvertisement(adId: string) {
-  const supabase = createActionClient(); // ATUALIZADO
+  const supabase = createActionClient();
+
+  // Adicionada verificação de usuário
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { success: false, message: "Não autenticado." };
+  }
+
   if (!adId) {
     return { success: false, message: "ID do anúncio não fornecido." };
   }
 
-  const { error } = await supabase
-    .from("advertisements")
-    .delete()
-    .eq("id", adId);
+  // Adicionado bloco try...catch para capturar erros do banco de dados
+  try {
+    const { error } = await supabase
+      .from("advertisements")
+      .delete()
+      .eq("id", adId);
 
-  if (error) {
-    return { success: false, message: "Erro ao deletar anúncio." };
+    if (error) throw error;
+
+    revalidatePath("/dashboard/anuncios");
+    return { success: true, message: "Anúncio deletado com sucesso!" };
+  } catch (error) {
+    console.error("ERRO DETALHADO AO DELETAR ANÚNCIO:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Erro ao deletar anúncio.";
+    return { success: false, message: errorMessage };
   }
-
-  revalidatePath("/dashboard/anuncios");
-  return { success: true, message: "Anúncio deletado com sucesso!" };
 }
 
 // NOVA ACTION: Para gerar a URL de Upload Segura

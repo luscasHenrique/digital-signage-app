@@ -24,7 +24,7 @@ const userFormSchema = z.object({
 
 type UserFormData = z.infer<typeof userFormSchema>;
 
-// Action para CRIAR um novo usuário - LÓGICA CORRIGIDA
+// Action para CRIAR um novo usuário
 export async function createUser(data: UserFormData) {
   const validation = userFormSchema.safeParse(data);
   if (!validation.success) {
@@ -37,38 +37,39 @@ export async function createUser(data: UserFormData) {
     };
   }
 
-  // 1. Cria o usuário na autenticação. O trigger do banco irá disparar
-  //    e criar um perfil básico automaticamente.
-  const { data: authData, error: authError } =
-    await supabaseAdmin.auth.admin.createUser({
-      email: validation.data.email,
-      password: validation.data.password,
-      email_confirm: true,
-    });
+  // Adicionado try...catch para a operação completa
+  try {
+    const { data: authData, error: authError } =
+      await supabaseAdmin.auth.admin.createUser({
+        email: validation.data.email,
+        password: validation.data.password,
+        email_confirm: true,
+      });
 
-  if (authError) {
-    return { success: false, message: { _server: [authError.message] } };
+    if (authError) throw authError;
+
+    const { error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        full_name: validation.data.full_name,
+        role: validation.data.role,
+      })
+      .eq("id", authData.user.id);
+
+    if (profileError) {
+      // Se a atualização do perfil falhar, deleta o usuário recém-criado
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      throw profileError;
+    }
+
+    revalidatePath("/dashboard/admin/usuarios");
+    return { success: true, message: "Usuário criado com sucesso!" };
+  } catch (error) {
+    console.error("ERRO AO CRIAR USUÁRIO:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Erro desconhecido.";
+    return { success: false, message: { _server: [errorMessage] } };
   }
-
-  // 2. AGORA: Em vez de 'insert', nós usamos 'update' para definir
-  //    a 'role' e o 'full_name' no perfil que o trigger acabou de criar.
-  const { error: profileError } = await supabaseAdmin
-    .from("profiles")
-    .update({
-      full_name: validation.data.full_name,
-      role: validation.data.role,
-    })
-    .eq("id", authData.user.id); // Encontra o perfil pelo ID do usuário
-
-  if (profileError) {
-    // Se a atualização do perfil falhar, é uma boa prática
-    // deletar o usuário que acabamos de criar na autenticação para evitar inconsistências.
-    await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-    return { success: false, message: { _server: [profileError.message] } };
-  }
-
-  revalidatePath("/dashboard/admin/usuarios");
-  return { success: true, message: "Usuário criado com sucesso!" };
 }
 
 // Action para ATUALIZAR um usuário existente
@@ -86,34 +87,33 @@ export async function updateUser(data: UserFormData) {
     };
   }
 
-  // 1. Atualiza o perfil
-  const { error: profileError } = await supabaseAdmin
-    .from("profiles")
-    .update({
-      full_name,
-      role,
-    })
-    .eq("id", id);
+  // Adicionado try...catch para a operação completa
+  try {
+    const { error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .update({ full_name, role })
+      .eq("id", id);
 
-  if (profileError) {
-    return { success: false, message: { _server: [profileError.message] } };
-  }
+    if (profileError) throw profileError;
 
-  // 2. Atualiza os dados de autenticação (email e senha, se fornecida)
-  const authUpdateData: { email?: string; password?: string } = { email };
-  if (password) {
-    authUpdateData.password = password;
-  }
-  const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
-    id,
-    authUpdateData
-  );
-  if (authError) {
-    return { success: false, message: { _server: [authError.message] } };
-  }
+    const authUpdateData: { email?: string; password?: string } = { email };
+    if (password) {
+      authUpdateData.password = password;
+    }
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
+      id,
+      authUpdateData
+    );
+    if (authError) throw authError;
 
-  revalidatePath("/dashboard/admin/usuarios");
-  return { success: true, message: "Usuário atualizado com sucesso!" };
+    revalidatePath("/dashboard/admin/usuarios");
+    return { success: true, message: "Usuário atualizado com sucesso!" };
+  } catch (error) {
+    console.error("ERRO AO ATUALIZAR USUÁRIO:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Erro desconhecido.";
+    return { success: false, message: { _server: [errorMessage] } };
+  }
 }
 
 // Action para EXCLUIR um usuário
@@ -124,32 +124,28 @@ export async function deleteUser(
     return { success: false, message: "ID do usuário não fornecido." };
   }
 
-  // A API de admin.deleteUser retorna { data: { user: User | null }, error }
-  const { data, error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+  // Adicionado try...catch para a operação completa
+  try {
+    const { data, error } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
-  // Verificação de erro explícito
-  if (error) {
-    console.error("Erro ao excluir usuário:", error);
+    if (error) throw error;
+
+    // Verificação de falha silenciosa
+    if (!data.user) {
+      throw new Error(
+        "Falha silenciosa ao excluir usuário. Verifique as permissões do servidor."
+      );
+    }
+
+    revalidatePath("/dashboard/admin/usuarios");
+    return { success: true, message: "Usuário excluído com sucesso!" };
+  } catch (error) {
+    console.error("ERRO AO EXCLUIR USUÁRIO:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Erro desconhecido.";
     return {
       success: false,
-      message: `Falha ao excluir o usuário: ${error.message}`,
+      message: `Falha ao excluir o usuário: ${errorMessage}`,
     };
   }
-
-  // A VERIFICAÇÃO MAIS IMPORTANTE:
-  // Se a exclusão falhar silenciosamente por falta de permissão,
-  // o objeto 'data.user' virá como null.
-  if (!data.user) {
-    console.error(
-      "Falha silenciosa ao excluir usuário. Verifique a chave SUPABASE_SERVICE_ROLE_KEY."
-    );
-    return {
-      success: false,
-      message:
-        "Falha ao excluir o usuário. Verifique as permissões do servidor.",
-    };
-  }
-
-  revalidatePath("/dashboard/admin/usuarios");
-  return { success: true, message: "Usuário excluído com sucesso!" };
 }

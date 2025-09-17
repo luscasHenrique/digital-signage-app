@@ -1,6 +1,7 @@
+// src/actions/companies.ts
 "use server";
 
-import { createActionClient } from "@/lib/supabase/server"; // ATUALIZADO
+import { createActionClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -22,77 +23,109 @@ type CompanyFormData = z.infer<typeof companySchema>;
 
 // Action para CRIAR uma nova empresa
 export async function createCompany(data: CompanyFormData) {
-  const supabase = createActionClient(); // ATUALIZADO
+  const supabase = createActionClient();
   const validation = companySchema.safeParse(data);
 
   if (!validation.success) {
     return { success: false, message: validation.error.flatten().fieldErrors };
   }
 
-  const { error } = await supabase.from("companies").insert(validation.data);
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("Usuário não autenticado.");
+    }
 
-  if (error) {
+    const { error } = await supabase.from("companies").insert(validation.data);
+
+    if (error) throw error;
+
+    revalidatePath("/dashboard/empresas");
+    return { success: true, message: "Empresa criada com sucesso!" };
+  } catch (error) {
+    console.error("ERRO AO CRIAR EMPRESA:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Erro desconhecido.";
     return {
       success: false,
-      message: { _server: ["Erro ao criar empresa. O slug já pode existir."] },
+      message: { _server: [`Erro ao criar empresa. ${errorMessage}`] },
     };
   }
-
-  revalidatePath("/dashboard/empresas");
-  return { success: true, message: "Empresa criada com sucesso!" };
 }
 
 // Action para ATUALIZAR uma empresa
 export async function updateCompany(data: CompanyFormData) {
-  const supabase = createActionClient(); // ATUALIZADO
+  const supabase = createActionClient();
   const validation = companySchema.safeParse(data);
 
   if (!validation.success) {
     return { success: false, message: validation.error.flatten().fieldErrors };
   }
 
-  const { id, ...companyData } = validation.data;
-  if (!id) {
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("Usuário não autenticado.");
+    }
+
+    const { id, ...companyData } = validation.data;
+    if (!id) {
+      throw new Error("ID da empresa não fornecido.");
+    }
+
+    const { error } = await supabase
+      .from("companies")
+      .update(companyData)
+      .eq("id", id);
+
+    if (error) throw error;
+
+    revalidatePath("/dashboard/empresas");
+    return { success: true, message: "Empresa atualizada com sucesso!" };
+  } catch (error) {
+    console.error("ERRO AO ATUALIZAR EMPRESA:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Erro desconhecido.";
     return {
       success: false,
-      message: { _server: ["ID da empresa não fornecido."] },
+      message: { _server: [`Erro ao atualizar empresa. ${errorMessage}`] },
     };
   }
-
-  const { error } = await supabase
-    .from("companies")
-    .update(companyData)
-    .eq("id", id);
-
-  if (error) {
-    return {
-      success: false,
-      message: {
-        _server: ["Erro ao atualizar empresa. O slug já pode existir."],
-      },
-    };
-  }
-
-  revalidatePath("/dashboard/empresas");
-  return { success: true, message: "Empresa atualizada com sucesso!" };
 }
 
 // Action para DELETAR uma empresa
 export async function deleteCompany(companyId: string) {
-  const supabase = createActionClient(); // ATUALIZADO
-  if (!companyId) {
-    return { success: false, message: "ID da empresa não fornecido." };
+  const supabase = createActionClient();
+
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("Usuário não autenticado.");
+    }
+
+    if (!companyId) {
+      throw new Error("ID da empresa não fornecido.");
+    }
+
+    const { error } = await supabase
+      .from("companies")
+      .delete()
+      .eq("id", companyId);
+
+    if (error) throw error;
+
+    revalidatePath("/dashboard/empresas");
+    return { success: true, message: "Empresa deletada com sucesso!" };
+  } catch (error) {
+    console.error("ERRO AO DELETAR EMPRESA:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Erro desconhecido.";
+    return { success: false, message: errorMessage };
   }
-
-  const { error } = await supabase
-    .from("companies")
-    .delete()
-    .eq("id", companyId);
-
-  if (error) {
-    return { success: false, message: "Erro ao deletar empresa." };
-  }
-
-  revalidatePath("/dashboard/empresas");
-  return { success: true, message: "Empresa deletada com sucesso!" };
 }

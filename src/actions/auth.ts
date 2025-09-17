@@ -1,3 +1,4 @@
+// src/actions/auth.ts
 "use server";
 
 import { createActionClient } from "@/lib/supabase/server"; // ATUALIZADO
@@ -29,12 +30,28 @@ export async function login(
 }
 
 export async function logout(): Promise<{
-  status: "success";
+  status: "success" | "error"; // O status agora pode ser de erro
   message: string;
 }> {
-  const supabase = createActionClient(); // ATUALIZADO
-  await supabase.auth.signOut();
+  const supabase = createActionClient();
 
-  revalidatePath("/");
-  return { status: "success", message: "Você saiu com sucesso." };
+  try {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      // Se houver um erro conhecido do Supabase, joga para o catch
+      throw error;
+    }
+
+    revalidatePath("/");
+    return { status: "success", message: "Você saiu com sucesso." };
+  } catch (error) {
+    console.error("ERRO NO LOGOUT:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
+    return {
+      status: "error",
+      message: `Falha ao fazer logout: ${errorMessage}`,
+    };
+  }
 }
