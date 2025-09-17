@@ -1,3 +1,4 @@
+// src/components/admin/advertisements/CompanySelector.tsx
 "use client";
 
 import { Check, ChevronsUpDown } from "lucide-react";

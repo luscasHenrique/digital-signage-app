@@ -1,4 +1,3 @@
-// src/app/(admin)/dashboard/admin/usuarios/page.tsx
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { Profile } from "@/types";
 import { UsersClient } from "@/components/admin/users/UsersClient";
@@ -7,17 +6,24 @@ import { UsersClient } from "@/components/admin/users/UsersClient";
 async function getUsersWithProfiles() {
   const { data: authUsersResponse, error: authError } =
     await supabaseAdmin.auth.admin.listUsers();
-  if (authError) throw new Error(authError.message);
+  if (authError)
+    throw new Error(`Erro ao buscar usuários: ${authError.message}`);
 
   const { data: profiles, error: profilesError } = await supabaseAdmin
     .from("profiles")
     .select("*");
-  if (profilesError) throw new Error(profilesError.message);
+  if (profilesError)
+    throw new Error(`Erro ao buscar perfis: ${profilesError.message}`);
+
+  // MELHORIA: Garante que os dados existem antes de continuar
+  if (!authUsersResponse || !profiles) {
+    throw new Error(
+      "Não foi possível carregar os dados completos dos usuários."
+    );
+  }
 
   const users = authUsersResponse.users.map((user) => {
-    const profile = profiles.find((p) => p.id === user.id) as
-      | Profile
-      | undefined;
+    const profile = profiles.find((p) => p.id === user.id); // 'as' removido para mais segurança de tipo
     return {
       ...user,
       full_name: profile?.full_name,

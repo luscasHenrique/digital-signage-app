@@ -1,17 +1,21 @@
-// src/app/(admin)/dashboard/empresas/page.tsx
-import { createClient } from "@/lib/supabase/server"; // ATUALIZADO
+import { createClient } from "@/lib/supabase/server";
 import { CompaniesClient } from "@/components/admin/companies/CompaniesClient";
 
 export default async function EmpresasPage() {
-  const supabase = createClient(); // ATUALIZADO
+  const supabase = createClient();
 
   const { data: companies, error } = await supabase
     .from("companies")
     .select("*")
     .order("name", { ascending: true });
 
+  // CORREÇÃO: Lança um erro para ativar o error.tsx
   if (error) {
     console.error("Erro ao buscar empresas:", error);
+    // Esta linha irá parar a renderização da página e mostrar o seu error.tsx
+    throw new Error(
+      "Não foi possível carregar os dados das empresas. Por favor, tente novamente mais tarde."
+    );
   }
 
   return (

@@ -1,24 +1,29 @@
-// src/app/(admin)/dashboard/anuncios/page.tsx
-import { createClient } from "@/lib/supabase/server"; // PONTO 1: Importa a função correta
+import { createClient } from "@/lib/supabase/server";
 import { AdvertisementsClient } from "@/components/admin/advertisements/AdvertisementsClient";
-import { Company } from "@/types";
+import { Advertisement, Company } from "@/types";
 
-// Função assíncrona que busca os dados no servidor antes de a página ser renderizada.
-async function getData() {
-  const supabase = createClient(); // PONTO 1: Usa a função correta
+// 1. Definimos um tipo específico para o resultado da nossa query
+// Ele é um Anúncio, mas garantimos a forma da propriedade 'companies'
+type AdvertisementWithCompaniesQueryResult = Advertisement & {
+  companies: Pick<Company, "id" | "name">[] | null;
+};
 
-  // Usamos um select especial para buscar os anúncios e, para cada um,
-  // as empresas associadas através da nossa tabela de junção.
+// 2. Adicionamos um tipo de retorno para a função getData
+async function getData(): Promise<{
+  advertisements: AdvertisementWithCompaniesQueryResult[];
+  companies: Company[];
+}> {
+  const supabase = createClient();
+
   const { data: advertisements, error: adError } = await supabase
     .from("advertisements")
-    .select("*, companies(id, name)") // Busca anúncios e as empresas relacionadas
+    .select("*, companies(id, name)")
     .order("created_at", { ascending: false });
 
-  // Também buscamos todas as empresas disponíveis. Iremos usá-las no formulário
-  // para permitir que o utilizador escolha onde o anúncio será exibido.
+  // A query de companies agora busca todos os campos
   const { data: companies, error: companyError } = await supabase
     .from("companies")
-    .select("id, name")
+    .select("*") // <--- AQUI ESTÁ A CORREÇÃO
     .order("name");
 
   if (adError || companyError) {
@@ -26,10 +31,14 @@ async function getData() {
       "Erro ao buscar dados para a página de anúncios:",
       adError || companyError
     );
+    throw new Error(
+      "Não foi possível carregar os dados dos anúncios. Por favor, tente novamente mais tarde."
+    );
   }
 
   return {
-    advertisements: advertisements || [],
+    advertisements:
+      (advertisements as AdvertisementWithCompaniesQueryResult[]) || [],
     companies: companies || [],
   };
 }
@@ -37,11 +46,10 @@ async function getData() {
 export default async function AnunciosPage() {
   const { advertisements, companies } = await getData();
 
-  // PONTO 2: Garantimos que a propriedade 'companies' em cada anúncio seja sempre um array.
-  // Isso evita erros de tipo no componente cliente.
+  // 3. O .map() agora está totalmente tipado, sem precisar de 'any'
   const typedAdvertisements = advertisements.map((ad) => ({
     ...ad,
-    companies: ad.companies || [],
+    companies: ad.companies || [], // Garante que 'companies' seja sempre um array
   }));
 
   return (
@@ -52,9 +60,6 @@ export default async function AnunciosPage() {
           Crie, edite e gerencie os anúncios da plataforma.
         </p>
       </div>
-      {/* Passamos os dados pré-carregados do servidor para o componente cliente,
-        que irá gerir toda a interatividade da página.
-      */}
       <AdvertisementsClient
         initialAdvertisements={typedAdvertisements}
         companies={companies as Company[]}

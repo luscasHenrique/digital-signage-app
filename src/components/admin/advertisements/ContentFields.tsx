@@ -1,3 +1,4 @@
+// src/components/admin/advertisements/ContentFields.tsx
 "use client";
 
 import {
