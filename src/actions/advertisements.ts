@@ -11,24 +11,34 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 // ESQUEMA DO SERVIDOR (ACTION SCHEMA)
+// Server NUNCA recebe arquivo; apenas URLs (upload é feito no client)
 const actionSchema = z
   .object({
     id: z.string().optional(),
     title: z.string().min(3, "O título é obrigatório."),
     description: z.string().optional(),
     type: z.nativeEnum(AdvertisementType),
-    content_file: z.instanceof(File).optional(),
+
+    // URL do conteúdo (obrigatório para qualquer tipo válido: upload ou link)
     content_url: z.string().optional(),
-    // As datas agora são validadas como strings, que é o formato que enviaremos (ISOString)
+
+    // Thumbnail como URL (OPCIONAL)
+    thumbnail_url: z.string().optional(),
+
+    // Datas como ISO string
     start_date: z.string(),
     end_date: z.string(),
+
     duration_seconds: z.coerce
       .number()
       .min(5, "A duração mínima é 5 segundos."),
+
     status: z
       .nativeEnum(AdvertisementStatus)
       .default(AdvertisementStatus.ACTIVE),
+
     company_ids: z.array(z.string()).min(1, "Selecione ao menos uma empresa."),
+
     overlay_text: z.string().optional(),
     overlay_position: z.nativeEnum(OverlayPosition).optional(),
     overlay_bg_color: z.string().optional(),
@@ -38,41 +48,58 @@ const actionSchema = z
     message: "A data final deve ser igual ou posterior à data inicial.",
     path: ["end_date"],
   })
-  // Validação customizada: garante que temos um ficheiro ou uma URL, dependendo do tipo.
+  // Conteúdo coerente com o tipo (upload vs link)
   .refine(
     (data) => {
       const isUpload =
         data.type === AdvertisementType.IMAGE_UPLOAD ||
         data.type === AdvertisementType.VIDEO_UPLOAD;
+
       const isLink =
         data.type === AdvertisementType.IMAGE_LINK ||
         data.type === AdvertisementType.VIDEO_LINK ||
         data.type === AdvertisementType.EMBED_LINK;
 
+      // Para link/embed: precisa de URL válida
       if (isLink) {
         return (
           !!data.content_url &&
           z.string().url().safeParse(data.content_url).success
         );
       }
-      // Para uploads, aceita um novo ficheiro ou uma URL já existente (no caso de edição sem alterar o ficheiro).
+
+      // Para upload: o upload já ocorreu no client; aqui exigimos a URL pública/path válido
       if (isUpload) {
         return (
-          (!!data.content_file && data.content_file.size > 0) ||
-          !!data.content_url
+          !!data.content_url &&
+          z.string().url().safeParse(data.content_url).success
         );
       }
-      return false; // Se o tipo for inválido
+
+      return false; // tipo inválido
     },
     {
       message:
-        "Um ficheiro (para Upload) ou uma URL válida (para Link) é obrigatório.",
+        "Um arquivo enviado (com URL pública) ou uma URL válida (para Link/Embed) é obrigatório.",
       path: ["content_url"],
     }
-  );
+  )
+  // Thumbnail OPCIONAL: valide apenas se enviada
+  .superRefine((data, ctx) => {
+    if (data.thumbnail_url) {
+      const ok = z.string().url().safeParse(data.thumbnail_url).success;
+      if (!ok) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["thumbnail_url"],
+          message: "URL da thumbnail inválida.",
+        });
+      }
+    }
+  });
 
 // ACTION PARA CRIAR ANÚNCIO
-// Agora ela recebe um objeto JSON, não mais um FormData
+// Agora ela recebe um objeto JSON (sem FormData)
 export async function createAdvertisement(data: z.infer<typeof actionSchema>) {
   const supabase = createActionClient();
   const validation = actionSchema.safeParse(data);
@@ -87,7 +114,7 @@ export async function createAdvertisement(data: z.infer<typeof actionSchema>) {
   if (!user)
     return { success: false, message: { _server: ["Não autenticado"] } };
 
-  const { company_ids, content_file, ...adData } = validation.data;
+  const { company_ids, ...adData } = validation.data;
 
   try {
     // Passo 1: Inserir o anúncio e tentar selecionar o ID de volta
@@ -96,10 +123,8 @@ export async function createAdvertisement(data: z.infer<typeof actionSchema>) {
       .insert({ ...adData, created_by: user.id })
       .select("id"); // Removido .single() para mais resiliência
 
-    // Se houver um erro direto do banco, ele será capturado pelo 'catch'
     if (adError) throw adError;
 
-    // Verifica se o insert retornou o ID. Se não, é provável ser um problema de RLS.
     const newAd = newAdArray?.[0];
     if (!newAd) {
       throw new Error(
@@ -110,20 +135,18 @@ export async function createAdvertisement(data: z.infer<typeof actionSchema>) {
     // Passo 2: Associar as empresas na tabela de junção
     const associations = company_ids.map((company_id) => ({
       advertisement_id: newAd.id,
-      company_id: company_id,
+      company_id,
     }));
 
     const { error: assocError } = await supabase
       .from("advertisements_companies")
       .insert(associations);
 
-    // Se houver um erro na associação, ele será capturado pelo 'catch'
     if (assocError) throw assocError;
 
     revalidatePath("/dashboard/anuncios");
     return { success: true, message: "Anúncio criado com sucesso!" };
   } catch (error) {
-    // Log detalhado no CONSOLE DO SERVIDOR (terminal) para depuração
     console.error("ERRO DETALHADO AO CRIAR ANÚNCIO:", error);
 
     const errorMessage =
@@ -134,6 +157,7 @@ export async function createAdvertisement(data: z.infer<typeof actionSchema>) {
     };
   }
 }
+
 // ACTION PARA ATUALIZAR ANÚNCIO
 export async function updateAdvertisement(data: z.infer<typeof actionSchema>) {
   const supabase = createActionClient();
@@ -143,7 +167,6 @@ export async function updateAdvertisement(data: z.infer<typeof actionSchema>) {
     return { success: false, message: validation.error.flatten().fieldErrors };
   }
 
-  // Adicionada verificação de usuário
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -151,7 +174,7 @@ export async function updateAdvertisement(data: z.infer<typeof actionSchema>) {
     return { success: false, message: { _server: ["Não autenticado"] } };
   }
 
-  const { id, company_ids, content_file, ...adData } = validation.data;
+  const { id, company_ids, ...adData } = validation.data;
   if (!id) {
     return {
       success: false,
@@ -159,11 +182,10 @@ export async function updateAdvertisement(data: z.infer<typeof actionSchema>) {
     };
   }
 
-  // Adicionado bloco try...catch para capturar erros do banco de dados
   try {
     const { error: adError } = await supabase
       .from("advertisements")
-      .update({ ...adData, last_edited_by: user.id }) // Opcional: registrar quem editou
+      .update({ ...adData, last_edited_by: user.id })
       .eq("id", id);
 
     if (adError) throw adError;
@@ -204,7 +226,6 @@ export async function updateAdvertisement(data: z.infer<typeof actionSchema>) {
 export async function deleteAdvertisement(adId: string) {
   const supabase = createActionClient();
 
-  // Adicionada verificação de usuário
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -216,7 +237,6 @@ export async function deleteAdvertisement(adId: string) {
     return { success: false, message: "ID do anúncio não fornecido." };
   }
 
-  // Adicionado bloco try...catch para capturar erros do banco de dados
   try {
     const { error } = await supabase
       .from("advertisements")

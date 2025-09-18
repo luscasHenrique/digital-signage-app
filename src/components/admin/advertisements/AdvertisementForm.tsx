@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, ImageIcon } from "lucide-react";
 import { RgbaColorPicker } from "@/components/ui/RgbaColorPicker";
 
 import {
@@ -22,7 +22,7 @@ import {
 } from "@/actions/advertisements";
 import { AdvertisementWithCompanies } from "./AdvertisementsClient";
 
-// Importa o schema e o tipo do nosso arquivo centralizado
+// Schema e tipos centralizados
 import {
   advertisementFormSchema,
   AdvertisementFormSchemaData,
@@ -55,9 +55,12 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-// Importa os subcomponentes
+// Subcomponentes
 import { CompanySelector } from "./CompanySelector";
 import { ContentFields } from "./ContentFields";
+
+// ✅ Tipo do payload aceito pelas actions (sem duplicar tipo/schema)
+type ActionInput = Parameters<typeof createAdvertisement>[0];
 
 interface AdvertisementFormProps {
   initialData: AdvertisementWithCompanies | null;
@@ -81,6 +84,11 @@ export function AdvertisementForm({
       description: initialData?.description || "",
       type: initialData?.type,
       content_url: initialData?.content_url || "",
+
+      // thumbnail
+      thumbnail_url: initialData?.thumbnail_url ?? "",
+      thumbnail_file: undefined,
+
       start_date: initialData?.start_date
         ? new Date(initialData.start_date)
         : null,
@@ -107,70 +115,132 @@ export function AdvertisementForm({
     }
 
     let finalContentUrl = data.content_url;
-    const file = data.content_file?.[0];
+    let finalThumbnailUrl = data.thumbnail_url;
+
+    // ✅ Tipar corretamente os arquivos vindos do form
+    const file = (data.content_file as FileList | undefined)?.[0];
+    const thumbFile = (data.thumbnail_file as FileList | undefined)?.[0];
 
     const isUpload =
       data.type === AdvertisementType.IMAGE_UPLOAD ||
       data.type === AdvertisementType.VIDEO_UPLOAD;
 
-    if (isUpload && file) {
+    try {
       setIsUploading(true);
-      setUploadProgress(10);
-      const signedUrlResult = await getSignedUploadUrl({
-        fileName: file.name,
-        fileType: file.type,
-      });
-      if (!signedUrlResult.success || !signedUrlResult.data) {
-        toast.error(signedUrlResult.message);
-        setIsUploading(false);
-        return;
-      }
-      const { url, path } = signedUrlResult.data;
-      setUploadProgress(50);
-      const uploadResponse = await fetch(url, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
-      });
-      if (!uploadResponse.ok) {
-        toast.error("Falha no upload do arquivo.");
-        setIsUploading(false);
-        return;
-      }
-      setUploadProgress(100);
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const bucketName = "advertisements";
-      finalContentUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${path}`;
-    }
+      setUploadProgress(5);
 
-    const finalData = {
-      ...data,
-      content_url: finalContentUrl,
-      start_date: data.start_date.toISOString(),
-      end_date: data.end_date.toISOString(),
-      duration_seconds: Number(data.duration_seconds),
-      content_file: undefined,
-      type: data.type,
-    };
-
-    const action = initialData ? updateAdvertisement : createAdvertisement;
-    const result = await action(finalData);
-
-    setIsUploading(false);
-
-    if (result.success) {
-      toast.success(result.message as string);
-      onSuccess();
-    } else {
-      if (result.message && typeof result.message === "object") {
-        Object.entries(result.message).forEach(([key, value]) => {
-          if (key === "_server") toast.error((value as string[]).join(", "));
-          else
-            form.setError(key as keyof AdvertisementFormSchemaData, {
-              message: (value as string[]).join(", "),
-            });
+      // 1) Upload do conteúdo principal, se for upload
+      if (isUpload && file) {
+        const signedUrlResult = await getSignedUploadUrl({
+          fileName: file.name,
+          fileType: file.type,
         });
+        if (!signedUrlResult.success || !signedUrlResult.data) {
+          toast.error(String(signedUrlResult.message));
+          setIsUploading(false);
+          return;
+        }
+        const { url, path } = signedUrlResult.data;
+
+        setUploadProgress(25);
+        const uploadResponse = await fetch(url, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type },
+        });
+        if (!uploadResponse.ok) {
+          toast.error("Falha no upload do arquivo do anúncio.");
+          setIsUploading(false);
+          return;
+        }
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const bucketName = "advertisements";
+        finalContentUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${path}`;
       }
+
+      setUploadProgress(50);
+
+      // 2) Upload da THUMBNAIL (obrigatória quando VIDEO_UPLOAD)
+      if (
+        data.type === AdvertisementType.VIDEO_UPLOAD ||
+        data.type === AdvertisementType.VIDEO_LINK
+      ) {
+        if (thumbFile) {
+          const signedThumb = await getSignedUploadUrl({
+            fileName: thumbFile.name,
+            fileType: thumbFile.type,
+          });
+          if (!signedThumb.success || !signedThumb.data) {
+            toast.error(String(signedThumb.message));
+            setIsUploading(false);
+            return;
+          }
+          const { url: thumbUrl, path: thumbPath } = signedThumb.data;
+
+          setUploadProgress(70);
+          const uploadThumbResp = await fetch(thumbUrl, {
+            method: "PUT",
+            body: thumbFile,
+            headers: { "Content-Type": thumbFile.type },
+          });
+          if (!uploadThumbResp.ok) {
+            toast.error("Falha no upload da thumbnail.");
+            setIsUploading(false);
+            return;
+          }
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+          const bucketName = "advertisements";
+          finalThumbnailUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${thumbPath}`;
+        }
+        // Se não teve arquivo, usaremos a thumbnail_url já informada no input (validada no schema)
+      }
+
+      setUploadProgress(100);
+
+      // ✅ Tipar o payload da action (e remover campos de arquivo)
+      const finalData: ActionInput = {
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        type: data.type,
+        content_url: finalContentUrl,
+        thumbnail_url: finalThumbnailUrl,
+        start_date: data.start_date.toISOString(),
+        end_date: data.end_date.toISOString(),
+        duration_seconds: Number(data.duration_seconds),
+        status: data.status,
+        company_ids: data.company_ids,
+        overlay_text: data.overlay_text,
+        overlay_position: data.overlay_position,
+        overlay_bg_color: data.overlay_bg_color,
+        overlay_text_color: data.overlay_text_color,
+      };
+
+      const action = initialData ? updateAdvertisement : createAdvertisement;
+      const result = await action(finalData);
+
+      setIsUploading(false);
+
+      if (result.success) {
+        toast.success(String(result.message));
+        onSuccess();
+      } else {
+        if (result.message && typeof result.message === "object") {
+          Object.entries(result.message).forEach(([key, value]) => {
+            if (key === "_server") toast.error((value as string[]).join(", "));
+            else
+              form.setError(key as keyof AdvertisementFormSchemaData, {
+                message: (value as string[]).join(", "),
+              });
+          });
+        } else {
+          toast.error(String(result.message ?? "Erro ao salvar anúncio."));
+        }
+      }
+    } catch (e) {
+      setIsUploading(false);
+      toast.error("Erro inesperado ao salvar anúncio.");
+      console.error(e);
     }
   };
 
@@ -191,7 +261,8 @@ export function AdvertisementForm({
               </FormItem>
             )}
           />
-          <div className="grid grid-cols-2  gap-6">
+
+          <div className="grid grid-cols-2 gap-6">
             <FormField
               control={form.control}
               name="type"
@@ -199,11 +270,20 @@ export function AdvertisementForm({
                 <FormItem>
                   <FormLabel>Tipo de Anúncio</FormLabel>
                   <Select
-                    onValueChange={(value) => {
+                    // ✅ tipar value para o enum
+                    onValueChange={(value: AdvertisementType) => {
                       field.onChange(value);
+                      // limpar campos ao trocar o tipo
                       form.setValue("content_url", "");
                       form.setValue("content_file", undefined);
-                      form.clearErrors(["content_url", "content_file"]);
+                      form.setValue("thumbnail_url", "");
+                      form.setValue("thumbnail_file", undefined);
+                      form.clearErrors([
+                        "content_url",
+                        "content_file",
+                        "thumbnail_url",
+                        "thumbnail_file",
+                      ]);
                     }}
                     defaultValue={field.value}
                   >
@@ -237,14 +317,16 @@ export function AdvertisementForm({
 
             <ContentFields form={form} adType={adType} />
 
+            {/* Barra de progresso de upload */}
             {isUploading && (
-              <div className="flex items-center gap-2 pt-2">
+              <div className="flex items-center gap-2 pt-2 col-span-2">
                 <Progress value={uploadProgress} className="w-full" />
                 <span className="text-sm text-muted-foreground">
                   {uploadProgress}%
                 </span>
               </div>
             )}
+
             <FormField
               control={form.control}
               name="duration_seconds"
@@ -259,7 +341,9 @@ export function AdvertisementForm({
               )}
             />
           </div>
-          <div className="grid grid-cols-2  gap-6">
+
+          {/* Datas */}
+          <div className="grid grid-cols-2 gap-6">
             <FormField
               control={form.control}
               name="start_date"
@@ -285,7 +369,7 @@ export function AdvertisementForm({
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
-                        selected={field.value ?? undefined} // CORREÇÃO AQUI
+                        selected={field.value ?? undefined}
                         onSelect={field.onChange}
                         initialFocus
                       />
@@ -321,7 +405,7 @@ export function AdvertisementForm({
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
-                        selected={field.value ?? undefined} // CORREÇÃO AQUI
+                        selected={field.value ?? undefined}
                         onSelect={field.onChange}
                         initialFocus
                       />
@@ -333,6 +417,7 @@ export function AdvertisementForm({
             />
           </div>
 
+          {/* Empresas */}
           <FormField
             control={form.control}
             name="company_ids"
@@ -340,6 +425,8 @@ export function AdvertisementForm({
               <CompanySelector field={field} companies={companies} />
             )}
           />
+
+          {/* Descrição */}
           <FormField
             control={form.control}
             name="description"
@@ -354,7 +441,7 @@ export function AdvertisementForm({
             )}
           />
         </div>
-
+        {/* Overlay Opcional */}
         <div className="space-y-4 rounded-lg border p-4">
           <h3 className="text-lg font-medium">Overlay Opcional</h3>
           <FormField
@@ -433,7 +520,59 @@ export function AdvertisementForm({
             </div>
           )}
         </div>
+        {/* Thumbnail (só para vídeo upload) */}+{" "}
+        {(adType === AdvertisementType.VIDEO_UPLOAD ||
+          adType === AdvertisementType.VIDEO_LINK) && (
+          <div className="space-y-4 rounded-lg border p-4">
+            <h3 className="text-lg font-medium flex items-center gap-2">
+              <ImageIcon className="h-4 w-4" />
+              Thumbnail (capa) — opcional para vídeo (upload ou link)
+            </h3>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Upload de imagem */}
+              <FormField
+                control={form.control}
+                name="thumbnail_file"
+                render={() => (
+                  <FormItem>
+                    <FormLabel>Arquivo da Capa (imagem)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) =>
+                          form.setValue(
+                            "thumbnail_file",
+                            e.target.files ?? undefined
+                          )
+                        }
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Ou URL direta */}
+              <FormField
+                control={form.control}
+                name="thumbnail_url"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      URL da Capa (opcional, se não enviar arquivo)
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="https://..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        )}
         <LoadingButton
           type="submit"
           loading={form.formState.isSubmitting || isUploading}

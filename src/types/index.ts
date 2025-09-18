@@ -61,6 +61,7 @@ export interface Advertisement {
   description?: string;
   type: AdvertisementType;
   content_url: string;
+  thumbnail_url?: string;
   start_date: string;
   end_date: string;
   duration_seconds: number;

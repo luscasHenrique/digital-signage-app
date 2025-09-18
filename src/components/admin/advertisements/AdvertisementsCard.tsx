@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import type { VariantProps } from "class-variance-authority";
 
-// Importando os tipos oficiais do seu projeto
+// Tipos oficiais
 import {
   Advertisement,
   AdvertisementStatus,
@@ -32,20 +32,17 @@ import {
   Company,
 } from "@/types";
 
-// Tipo que corresponde exatamente ao que o AdvertisementsClient envia (com 'companies' garantido)
+// O client garante companies
 type AdvertisementWithCompanies = Advertisement & { companies: Company[] };
 
-// Props que o componente de card vai receber
 interface AdvertisementsCardProps {
   anuncio: AdvertisementWithCompanies;
   onEdit: (anuncio: AdvertisementWithCompanies) => void;
   onDelete: (anuncio: AdvertisementWithCompanies) => void;
 }
 
-// Criando um tipo seguro para as variantes do Badge
 type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
 
-// Mapeamento do Enum de Status para o texto e estilo que serão exibidos
 const statusMap: Record<
   AdvertisementStatus,
   { text: string; variant: BadgeVariant }
@@ -55,9 +52,7 @@ const statusMap: Record<
 };
 
 /**
- * Função auxiliar que extrai a URL da thumbnail de um vídeo do YouTube.
- * @param url A URL do vídeo do YouTube.
- * @returns A URL da imagem da thumbnail ou null se a URL for inválida.
+ * Extrai a thumbnail de um link do YouTube (se aplicável).
  */
 function getYoutubeThumbnailUrl(url: string): string | null {
   try {
@@ -87,13 +82,12 @@ export function AdvertisementsCard({
 }: AdvertisementsCardProps) {
   const statusInfo = statusMap[anuncio.status];
 
-  // Função interna para renderizar o conteúdo do preview de forma condicional
   const renderPreview = () => {
     const isImageType =
       anuncio.type === AdvertisementType.IMAGE_LINK ||
       anuncio.type === AdvertisementType.IMAGE_UPLOAD;
 
-    // Se for um tipo de imagem, renderiza o componente Image com a URL direta.
+    // 1) Imagem: usa a própria imagem do anúncio
     if (isImageType) {
       return (
         <Image
@@ -106,7 +100,24 @@ export function AdvertisementsCard({
       );
     }
 
-    // Se não for imagem, tenta obter a thumbnail do YouTube.
+    // 2) Não é imagem: se houver thumbnail_url, prioriza ela
+    const hasThumb =
+      typeof anuncio.thumbnail_url === "string" &&
+      anuncio.thumbnail_url.trim().length > 0;
+
+    if (hasThumb) {
+      return (
+        <Image
+          src={anuncio.thumbnail_url as string}
+          alt={`Thumbnail do anúncio: ${anuncio.title}`}
+          fill
+          className="object-cover"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+        />
+      );
+    }
+
+    // 3) Sem thumbnail_url: se for link/embed de YouTube, tenta extrair capa
     const youtubeThumbnail = getYoutubeThumbnailUrl(anuncio.content_url);
     if (youtubeThumbnail) {
       return (
@@ -120,7 +131,7 @@ export function AdvertisementsCard({
       );
     }
 
-    // Caso não seja imagem nem um link de YouTube válido, mostra um ícone de fallback.
+    // 4) Fallback padrão: ícone de vídeo/câmera
     return (
       <div className="w-full h-full bg-secondary flex items-center justify-center">
         <Video className="h-12 w-12 text-muted-foreground" />
