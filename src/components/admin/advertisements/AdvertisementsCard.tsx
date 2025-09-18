@@ -50,7 +50,7 @@ const statusMap: Record<
   AdvertisementStatus,
   { text: string; variant: BadgeVariant }
 > = {
-  [AdvertisementStatus.ACTIVE]: { text: "Ativo", variant: "default" },
+  [AdvertisementStatus.ACTIVE]: { text: "Ativo", variant: "success" },
   [AdvertisementStatus.INACTIVE]: { text: "Inativo", variant: "destructive" },
 };
 

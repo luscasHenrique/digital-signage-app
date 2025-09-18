@@ -37,7 +37,7 @@ export const columns = ({
       return (
         <Badge
           variant={
-            status === AdvertisementStatus.ACTIVE ? "default" : "destructive"
+            status === AdvertisementStatus.ACTIVE ? "success" : "destructive"
           }
         >
           {status === AdvertisementStatus.ACTIVE ? "Ativo" : "Inativo"}
