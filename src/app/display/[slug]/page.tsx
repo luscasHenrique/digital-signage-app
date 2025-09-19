@@ -1,53 +1,88 @@
+// src/app/display/[slug]/page.tsx
+import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { AdvertisementStatus } from "@/types";
+import { Advertisement, AdvertisementStatus, Company } from "@/types";
 import { CompanyDisplay } from "@/components/display/CompanyDisplay";
 
-// A tipagem da prop 'params' agora reflete que é uma Promise
+export const revalidate = 0; // sem cache
+export const dynamic = "force-dynamic"; // SSR dinâmico
+
 interface DisplayPageProps {
+  // Next.js 15: params é uma Promise
   params: Promise<{
     slug: string;
   }>;
 }
 
-// A página já é 'async', o que está correto
 export default async function DisplayPage({ params }: DisplayPageProps) {
   const supabase = createClient();
 
-  // CORREÇÃO: Usamos 'await' para resolver a Promise e obter o objeto params
-  const resolvedParams = await params;
-  const companySlug = resolvedParams.slug;
+  // ✅ aguarde os params antes de acessar propriedades
+  const { slug } = await params;
 
-  const now = new Date().toISOString();
+  // 1) Empresa pelo slug
+  const { data: company, error: companyErr } = await supabase
+    .from("companies")
+    .select("id, name, slug")
+    .eq("slug", slug)
+    .single<Company>();
 
-  const { data: ads, error } = await supabase
-    .from("advertisements")
-    .select(
-      `
-      *,
-      advertisements_companies!inner(
-        companies!inner(
-          slug
-        )
-      )
-    `
-    )
-    .eq("advertisements_companies.companies.slug", companySlug)
-    .eq("status", AdvertisementStatus.ACTIVE)
-    .lte("start_date", now)
-    .gte("end_date", now);
-
-  if (error) {
-    console.error("Erro ao buscar anúncios para display:", error);
-    throw new Error("Não foi possível carregar os dados dos anúncios.");
+  if (companyErr || !company) {
+    notFound();
   }
 
-  if (!ads || ads.length === 0) {
+  const nowIso = new Date().toISOString();
+
+  // 2) IDs de anúncios vinculados à empresa
+  const { data: links, error: linkErr } = await supabase
+    .from("advertisements_companies")
+    .select("advertisement_id")
+    .eq("company_id", company.id);
+
+  if (linkErr) {
+    console.error("Erro ao buscar vínculos:", linkErr);
     return (
-      <div className="h-screen w-screen bg-black flex items-center justify-center text-white">
-        Nenhum anúncio ativo para esta empresa no momento.
-      </div>
+      <main className="h-screen w-screen bg-black grid place-items-center text-white">
+        Erro ao carregar vínculos de anúncios.
+      </main>
     );
   }
 
-  return <CompanyDisplay ads={ads} animationType="slideFromRight" />;
+  const ids = (links ?? []).map((l) => l.advertisement_id) as string[];
+
+  // 3) Anúncios válidos para exibição agora
+  let ads: Advertisement[] = [];
+  if (ids.length > 0) {
+    const { data: adsData, error: adsErr } = await supabase
+      .from("advertisements")
+      .select("*")
+      .in("id", ids)
+      .eq("status", AdvertisementStatus.ACTIVE)
+      .lte("start_date", nowIso)
+      .gte("end_date", nowIso)
+      .order("created_at", { ascending: false });
+
+    if (adsErr) {
+      console.error("Erro ao buscar anúncios:", adsErr);
+    } else {
+      ads = (adsData ?? []) as Advertisement[];
+    }
+  }
+
+  if (ads.length === 0) {
+    return (
+      <main className="h-screen w-screen bg-black flex items-center justify-center text-white">
+        Nenhum anúncio ativo para esta empresa no momento.
+      </main>
+    );
+  }
+
+  // 4) Passa companyId para ativar o Realtime no client
+  return (
+    <CompanyDisplay
+      ads={ads}
+      companyId={company.id}
+      animationType="slideFromRight"
+    />
+  );
 }
