@@ -167,6 +167,8 @@ export default function AuditClient({
   const [to, setTo] = useState(initialFilters.to);
 
   const totalPages = Math.max(1, Math.ceil(total / perPage));
+  const showingFrom = total === 0 ? 0 : (page - 1) * perPage + 1;
+  const showingTo = Math.min(total, page * perPage);
 
   const applyFilters = (nextPage = 1) => {
     const params = new URLSearchParams(sp?.toString() || "");
@@ -192,13 +194,25 @@ export default function AuditClient({
     router.replace(`?${params.toString()}`);
   };
 
+  const changePerPage = (n: number) => {
+    const params = new URLSearchParams(sp?.toString() || "");
+    params.set("perPage", String(n));
+    params.set("page", "1"); // reset para a primeira página
+    router.replace(`?${params.toString()}`);
+  };
+
   return (
     <main className="p-6 space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-2xl font-semibold">Auditoria</h1>
-        <div className="text-sm text-muted-foreground">
-          {total} registro{total === 1 ? "" : "s"} • página {page} de{" "}
-          {totalPages}
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <span>
+            {total} registro{total === 1 ? "" : "s"} • página {page} de{" "}
+            {totalPages}
+          </span>
+          <span className="hidden md:inline-block">
+            • Exibindo {showingFrom}-{showingTo}
+          </span>
         </div>
       </div>
 
@@ -268,13 +282,31 @@ export default function AuditClient({
             </div>
           </div>
 
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex items-center gap-3 flex-wrap">
             <Button variant="secondary" onClick={() => applyFilters(1)}>
               Aplicar filtros
             </Button>
             <Button variant="ghost" onClick={clearFilters}>
               Limpar
             </Button>
+
+            {/* Itens por página */}
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                Itens por página
+              </span>
+              <select
+                value={perPage}
+                onChange={(e) => changePerPage(parseInt(e.target.value, 10))}
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+              >
+                {[10, 20, 50, 100].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -311,9 +343,23 @@ export default function AuditClient({
       {/* Paginação */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-          Exibindo {items.length} de {total} registros
+          Exibindo {showingFrom}-{showingTo} de {total}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => {
+              const params = new URLSearchParams(sp?.toString() || "");
+              params.set("page", "1");
+              params.set("perPage", String(perPage));
+              router.replace(`?${params.toString()}`);
+            }}
+          >
+            Primeira
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -329,6 +375,7 @@ export default function AuditClient({
             <ChevronLeft className="h-4 w-4 mr-1" />
             Anterior
           </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -343,6 +390,20 @@ export default function AuditClient({
           >
             Próxima
             <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages}
+            onClick={() => {
+              const params = new URLSearchParams(sp?.toString() || "");
+              params.set("page", String(totalPages));
+              params.set("perPage", String(perPage));
+              router.replace(`?${params.toString()}`);
+            }}
+          >
+            Última
           </Button>
         </div>
       </div>
