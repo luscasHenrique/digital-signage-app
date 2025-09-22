@@ -1,6 +1,7 @@
 // src/components/admin/companies/CompaniesColumns.tsx
 "use client";
 
+import Link from "next/link";
 import { ColumnDef } from "@tanstack/react-table";
 import { MoreHorizontal, ShieldCheck, ShieldOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,10 +18,10 @@ import { Badge } from "@/components/ui/badge";
 
 export const columns = ({
   onEdit,
-  onDelete, // 1. Adicionar onDelete às props
+  onDelete,
 }: {
   onEdit: (company: Company) => void;
-  onDelete: (company: Company) => void; // 2. Definir o tipo da função
+  onDelete: (company: Company) => void;
 }): ColumnDef<Company>[] => [
   {
     accessorKey: "name",
@@ -37,7 +38,7 @@ export const columns = ({
     accessorKey: "is_private",
     header: "Visibilidade",
     cell: ({ row }) => {
-      const isPrivate = row.getValue("is_private");
+      const isPrivate = row.getValue("is_private") as boolean;
       return isPrivate ? (
         <Badge variant="secondary">
           <ShieldCheck className="mr-1 h-3 w-3" /> Privada
@@ -53,7 +54,9 @@ export const columns = ({
     accessorKey: "created_at",
     header: "Criada em",
     cell: ({ row }) =>
-      new Date(row.getValue("created_at")).toLocaleDateString("pt-BR"),
+      new Date(row.getValue("created_at") as string).toLocaleDateString(
+        "pt-BR"
+      ),
   },
   {
     id: "actions",
@@ -69,11 +72,18 @@ export const columns = ({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Ações</DropdownMenuLabel>
+
             <DropdownMenuItem onClick={() => onEdit(company)}>
               Editar
             </DropdownMenuItem>
+
+            <DropdownMenuItem asChild>
+              <Link href={`/dashboard/empresas/${company.id}/anuncios`}>
+                Gerenciar anúncios
+              </Link>
+            </DropdownMenuItem>
+
             <DropdownMenuSeparator />
-            {/* 3. Chamar a função onDelete ao clicar */}
             <DropdownMenuItem
               className="text-red-500 focus:bg-red-100 focus:text-red-700"
               onClick={() => onDelete(company)}
