@@ -2,26 +2,21 @@
 
 import { User } from "@supabase/supabase-js";
 
-// --- ENUMS ---
-// Enums garantem a consistência dos dados em toda a aplicação.
+/* =========================
+   ENUMS
+   ========================= */
 
-// Enum para os tipos de usuário (NOVO)
 export enum UserRole {
   ADMIN = "ADMIN",
   STANDARD = "STANDARD",
 }
 
-// Interface para a tabela 'users'
-export type UserWithProfile = User &
-  Partial<Pick<Profile, "full_name" | "role">>;
-
-// Enums para os Anúncios
 export enum AdvertisementType {
-  IMAGE_UPLOAD = "IMAGE_UPLOAD", // Upload de uma imagem
-  VIDEO_UPLOAD = "VIDEO_UPLOAD", // Upload de um vídeo
-  IMAGE_LINK = "IMAGE_LINK", // Link para uma imagem externa
-  VIDEO_LINK = "VIDEO_LINK", // Link para um vídeo externo
-  EMBED_LINK = "EMBED_LINK", // Link de incorporação (YouTube, etc.)
+  IMAGE_UPLOAD = "IMAGE_UPLOAD",
+  VIDEO_UPLOAD = "VIDEO_UPLOAD",
+  IMAGE_LINK = "IMAGE_LINK",
+  VIDEO_LINK = "VIDEO_LINK",
+  EMBED_LINK = "EMBED_LINK",
 }
 
 export enum AdvertisementStatus {
@@ -34,17 +29,23 @@ export enum OverlayPosition {
   BOTTOM = "BOTTOM",
 }
 
-// --- INTERFACES ---
-// Interfaces modelam a estrutura dos nossos dados do banco.
+/* =========================
+   PERFIL / USUÁRIO
+   ========================= */
 
-// Interface para a tabela 'profiles' (ATUALIZADA)
-// Renomeada de UserProfile para Profile para corresponder à tabela do banco.
 export interface Profile {
-  id: string; // Corresponde ao auth.users.id
+  id: string; // corresponde a auth.users.id
   full_name?: string;
   avatar_url?: string;
-  role: UserRole; // A nova propriedade de role/função
+  role: UserRole;
 }
+
+export type UserWithProfile = User &
+  Partial<Pick<Profile, "full_name" | "role">>;
+
+/* =========================
+   EMPRESAS
+   ========================= */
 
 export interface Company {
   id: string;
@@ -54,6 +55,10 @@ export interface Company {
   password?: string;
   created_at: string;
 }
+
+/* =========================
+   ANÚNCIOS
+   ========================= */
 
 export interface Advertisement {
   id: string;
@@ -70,18 +75,9 @@ export interface Advertisement {
   overlay_position?: OverlayPosition;
   overlay_bg_color?: string;
   overlay_text_color?: string;
-  created_by?: string; // UUID do perfil que criou
-  last_edited_by?: string; // UUID do perfil que editou
+  created_by?: string;
+  last_edited_by?: string;
   created_at: string;
   updated_at: string;
-  companies?: Company[]; // Relação com empresas
-}
-
-export interface AuditLog {
-  id: number;
-  user_id: string; // UUID do perfil que realizou a ação
-  action: string;
-  // CORRIGIDO: Substituído 'any' por 'unknown' para segurança de tipo.
-  details: Record<string, unknown>;
-  created_at: string;
+  companies?: Company[];
 }
