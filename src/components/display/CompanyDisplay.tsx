@@ -337,7 +337,7 @@ export function CompanyDisplay({
             minute: "2-digit",
           })}
         </div>
-        <div className="text-sm capitalize">
+        <div className="text-sm normal-case">
           {now.toLocaleDateString("pt-BR", {
             weekday: "long",
             day: "numeric",
