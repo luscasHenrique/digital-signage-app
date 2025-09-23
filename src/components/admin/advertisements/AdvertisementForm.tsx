@@ -520,7 +520,7 @@ export function AdvertisementForm({
             </div>
           )}
         </div>
-        {/* Thumbnail (só para vídeo upload) */}+{" "}
+        {/* Thumbnail (só para vídeo upload) */}
         {(adType === AdvertisementType.VIDEO_UPLOAD ||
           adType === AdvertisementType.VIDEO_LINK) && (
           <div className="space-y-4 rounded-lg border p-4">
