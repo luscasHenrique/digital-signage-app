@@ -90,6 +90,7 @@ export const advertisementFormSchema = z
       }
 
       if (isUpload) {
+        // A validação de arquivo obrigatório é feita aqui
         return (
           (typeof FileList !== "undefined" &&
             data.content_file instanceof FileList &&
@@ -103,15 +104,14 @@ export const advertisementFormSchema = z
     {
       message:
         "Um arquivo (para Upload) ou uma URL válida (para Link) é obrigatório.",
-      path: ["content_url"],
+      path: ["content_url"], // O erro aponta para o campo de URL, mas a mensagem é genérica
     }
   )
-  // Thumbnail OPCIONAL: se preencher, precisa ser válida
+  // ✅ Thumbnail e TIPO DE ARQUIVO (validações atualizadas aqui)
   .superRefine((data, ctx) => {
-    // Se veio URL, precisa ser válida
+    // 1. Valida URL da thumbnail (se existir)
     if (data.thumbnail_url) {
-      const ok = z.string().url().safeParse(data.thumbnail_url).success;
-      if (!ok) {
+      if (!z.string().url().safeParse(data.thumbnail_url).success) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["thumbnail_url"],
@@ -119,18 +119,36 @@ export const advertisementFormSchema = z
         });
       }
     }
-    // Se veio FileList, precisa ter ao menos um arquivo
-    if (data.thumbnail_file !== undefined) {
-      const isValid =
-        typeof FileList !== "undefined" &&
-        data.thumbnail_file instanceof FileList &&
-        data.thumbnail_file.length > 0;
 
-      if (!isValid) {
+    // 2. Valida arquivo de thumbnail (se existir, verifica se é imagem)
+    if (
+      data.thumbnail_file &&
+      data.thumbnail_file instanceof FileList &&
+      data.thumbnail_file.length > 0
+    ) {
+      const file = data.thumbnail_file[0];
+      if (!file.type.startsWith("image/")) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["thumbnail_file"],
-          message: "Arquivo de thumbnail inválido.",
+          message: "O arquivo da thumbnail deve ser uma imagem.",
+        });
+      }
+    }
+
+    // 3. Valida arquivo de conteúdo principal (se for IMAGE_UPLOAD, verifica se é imagem)
+    if (
+      data.type === AdvertisementType.IMAGE_UPLOAD &&
+      data.content_file &&
+      data.content_file instanceof FileList &&
+      data.content_file.length > 0
+    ) {
+      const file = data.content_file[0];
+      if (!file.type.startsWith("image/")) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["content_file"],
+          message: "O arquivo de conteúdo deve ser uma imagem.",
         });
       }
     }
