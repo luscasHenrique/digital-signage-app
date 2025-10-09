@@ -319,17 +319,25 @@ export async function getSignedUploadUrl({
     return { success: false, message: "Não autenticado." };
   }
 
-  // Cria um nome de arquivo único para evitar conflitos de nomes iguais
+  // Cria um nome de arquivo único para evitar conflitos
   const path = `${user.id}/${Date.now()}-${fileName.replace(/\s/g, "_")}`;
 
   try {
+    // Objeto de opções com todas as configurações necessárias
+    const uploadOptions = {
+      upsert: true, // Permite substituir um arquivo com o mesmo nome (opcional)
+      contentType: fileType, // Especifica o tipo de arquivo para o qual a URL é válida
+      expiresIn: 60, // Define o tempo de validade da URL em segundos
+    };
+
+    // Chamada corrigida com 2 argumentos: o caminho e o objeto de opções
     const { data, error } = await supabase.storage
-      .from("advertisements") // VERIFIQUE: Este é o nome do seu bucket no Supabase?
-      .createSignedUploadUrl(path);
+      .from("advertisements") // VERIFIQUE: Este é o nome do seu bucket
+      .createSignedUploadUrl(path, uploadOptions);
 
     if (error) throw error;
 
-    // Retorna a URL assinada (para onde o arquivo será enviado) e o 'path' (para construir a URL pública depois)
+    // Retorna a URL assinada e o caminho do arquivo
     return {
       success: true,
       message: "URL gerada com sucesso.",
