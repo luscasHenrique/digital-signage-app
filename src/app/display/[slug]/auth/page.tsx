@@ -1,3 +1,4 @@
+// src/app/display/[slug]/auth/page.tsx
 import { PasswordForm } from "@/components/auth/PasswordForm";
 import {
   Card,

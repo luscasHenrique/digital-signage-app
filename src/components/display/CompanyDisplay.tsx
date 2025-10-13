@@ -11,6 +11,7 @@ import {
   OverlayPosition,
 } from "@/types";
 import { createClient } from "@/lib/supabase/client";
+import { FullscreenButton } from "../ui/fullscreen-button";
 
 // ---- Animações ----
 const animationPresets: Record<string, Variants> = {
@@ -299,7 +300,10 @@ export function CompanyDisplay({
   };
 
   return (
-    <main className="h-screen w-screen bg-black relative overflow-hidden text-white">
+    <main
+      id="fullscreen-display"
+      className="h-screen w-screen bg-black relative overflow-hidden text-white"
+    >
       <AnimatePresence>
         <motion.div
           key={currentAd?.id}
@@ -344,6 +348,10 @@ export function CompanyDisplay({
             month: "long",
           })}
         </div>
+      </div>
+
+      <div className="control-buttons">
+        <FullscreenButton targetId="fullscreen-display" />
       </div>
     </main>
   );
