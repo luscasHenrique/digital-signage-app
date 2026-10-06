@@ -1,31 +1,32 @@
 // src/actions/users.ts
 "use server";
 
+import { revalidatePath } from "next/cache";
+import { getAuthContext } from "@/lib/auth";
+import { userFormSchema, type UserFormData } from "@/lib/schemas";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { UserRole } from "@/types";
-import { revalidatePath } from "next/cache";
-import { z } from "zod";
 
-const userFormSchema = z.object({
-  id: z.string().optional(),
-  full_name: z
-    .string()
-    .min(3, "O nome completo é obrigatório.")
-    .optional()
-    .or(z.literal("")),
-  email: z.string().email("O e-mail fornecido é inválido."),
-  password: z
-    .string()
-    .min(6, "A senha deve ter no mínimo 6 caracteres.")
-    .optional()
-    .or(z.literal("")),
-  role: z.nativeEnum(UserRole),
-});
+type FieldErrors = Record<string, string[] | undefined>;
+type FormActionResult =
+  | { success: true; message: string }
+  | { success: false; message: FieldErrors };
 
-type UserFormData = z.infer<typeof userFormSchema>;
+const ACCESS_DENIED = "Acesso negado: apenas administradores.";
+
+// Estas actions usam a service role (ignora RLS), então o chamador
+// precisa ser verificado como ADMIN antes de qualquer operação.
+async function getAdminContext() {
+  const ctx = await getAuthContext();
+  return ctx?.role === UserRole.ADMIN ? ctx : null;
+}
 
 // Action para CRIAR um novo usuário
-export async function createUser(data: UserFormData) {
+export async function createUser(data: UserFormData): Promise<FormActionResult> {
+  if (!(await getAdminContext())) {
+    return { success: false, message: { _server: [ACCESS_DENIED] } };
+  }
+
   const validation = userFormSchema.safeParse(data);
   if (!validation.success) {
     return { success: false, message: validation.error.flatten().fieldErrors };
@@ -37,7 +38,6 @@ export async function createUser(data: UserFormData) {
     };
   }
 
-  // Adicionado try...catch para a operação completa
   try {
     const { data: authData, error: authError } =
       await supabaseAdmin.auth.admin.createUser({
@@ -48,6 +48,7 @@ export async function createUser(data: UserFormData) {
 
     if (authError) throw authError;
 
+    // A linha em profiles é criada por trigger no banco; aqui completamos os dados.
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
       .update({
@@ -66,14 +67,17 @@ export async function createUser(data: UserFormData) {
     return { success: true, message: "Usuário criado com sucesso!" };
   } catch (error) {
     console.error("ERRO AO CRIAR USUÁRIO:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Erro desconhecido.";
-    return { success: false, message: { _server: [errorMessage] } };
+    return { success: false, message: { _server: [errorMessage(error)] } };
   }
 }
 
 // Action para ATUALIZAR um usuário existente
-export async function updateUser(data: UserFormData) {
+export async function updateUser(data: UserFormData): Promise<FormActionResult> {
+  const ctx = await getAdminContext();
+  if (!ctx) {
+    return { success: false, message: { _server: [ACCESS_DENIED] } };
+  }
+
   const validation = userFormSchema.safeParse(data);
   if (!validation.success) {
     return { success: false, message: validation.error.flatten().fieldErrors };
@@ -86,8 +90,13 @@ export async function updateUser(data: UserFormData) {
       message: { _server: ["ID do usuário não fornecido."] },
     };
   }
+  if (id === ctx.user.id && role !== UserRole.ADMIN) {
+    return {
+      success: false,
+      message: { role: ["Você não pode remover seu próprio acesso de administrador."] },
+    };
+  }
 
-  // Adicionado try...catch para a operação completa
   try {
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
@@ -96,7 +105,7 @@ export async function updateUser(data: UserFormData) {
 
     if (profileError) throw profileError;
 
-    const authUpdateData: { email?: string; password?: string } = { email };
+    const authUpdateData: { email: string; password?: string } = { email };
     if (password) {
       authUpdateData.password = password;
     }
@@ -110,9 +119,7 @@ export async function updateUser(data: UserFormData) {
     return { success: true, message: "Usuário atualizado com sucesso!" };
   } catch (error) {
     console.error("ERRO AO ATUALIZAR USUÁRIO:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Erro desconhecido.";
-    return { success: false, message: { _server: [errorMessage] } };
+    return { success: false, message: { _server: [errorMessage(error)] } };
   }
 }
 
@@ -120,11 +127,16 @@ export async function updateUser(data: UserFormData) {
 export async function deleteUser(
   userId: string
 ): Promise<{ success: boolean; message: string }> {
+  const ctx = await getAdminContext();
+  if (!ctx) return { success: false, message: ACCESS_DENIED };
+
   if (!userId) {
     return { success: false, message: "ID do usuário não fornecido." };
   }
+  if (userId === ctx.user.id) {
+    return { success: false, message: "Você não pode excluir a si mesmo." };
+  }
 
-  // Adicionado try...catch para a operação completa
   try {
     const { data, error } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
@@ -141,11 +153,13 @@ export async function deleteUser(
     return { success: true, message: "Usuário excluído com sucesso!" };
   } catch (error) {
     console.error("ERRO AO EXCLUIR USUÁRIO:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Erro desconhecido.";
     return {
       success: false,
-      message: `Falha ao excluir o usuário: ${errorMessage}`,
+      message: `Falha ao excluir o usuário: ${errorMessage(error)}`,
     };
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Erro desconhecido.";
 }

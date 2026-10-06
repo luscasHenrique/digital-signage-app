@@ -25,12 +25,9 @@ export const createClient = () => {
         // Usa 'await' para esperar o objeto de cookies
         return (await cookieStore).get(name)?.value;
       },
-      set(name: string, value: string, options: CookieOptions) {
-        // Vazio de propósito para evitar erros em Server Components
-      },
-      remove(name: string, options: CookieOptions) {
-        // Vazio de propósito para evitar erros em Server Components
-      },
+      // Server Components não podem escrever cookies; a sessão é renovada no middleware.
+      set() {},
+      remove() {},
     },
   });
 };

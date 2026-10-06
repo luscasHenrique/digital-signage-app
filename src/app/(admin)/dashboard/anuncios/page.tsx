@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { AdvertisementsClient } from "@/components/admin/advertisements/AdvertisementsClient";
-import { Advertisement, Company } from "@/types";
+import { Advertisement, COMPANY_PUBLIC_COLUMNS, Company } from "@/types";
 
 // 1. Definimos um tipo específico para o resultado da nossa query
 // Ele é um Anúncio, mas garantimos a forma da propriedade 'companies'
@@ -23,7 +23,7 @@ async function getData(): Promise<{
   // A query de companies agora busca todos os campos
   const { data: companies, error: companyError } = await supabase
     .from("companies")
-    .select("*") // <--- AQUI ESTÁ A CORREÇÃO
+    .select(COMPANY_PUBLIC_COLUMNS)
     .order("name");
 
   if (adError || companyError) {

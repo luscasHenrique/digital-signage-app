@@ -52,9 +52,11 @@ export interface Company {
   name: string;
   slug: string;
   is_private: boolean;
-  password?: string;
   created_at: string;
 }
+
+/** Colunas de `companies` que podem ir para o navegador (nunca inclui `password`). */
+export const COMPANY_PUBLIC_COLUMNS = "id, name, slug, is_private, created_at";
 
 /* =========================
    ANÚNCIOS

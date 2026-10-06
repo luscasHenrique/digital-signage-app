@@ -174,11 +174,11 @@ export default function AuditClient({
     const params = new URLSearchParams(sp?.toString() || "");
     params.set("page", String(nextPage));
     params.set("perPage", String(perPage));
-    q ? params.set("q", q) : params.delete("q");
-    action ? params.set("action", action) : params.delete("action");
-    table ? params.set("table", table) : params.delete("table");
-    from ? params.set("from", from) : params.delete("from");
-    to ? params.set("to", to) : params.delete("to");
+    const filters = { q, action, table, from, to };
+    for (const [key, value] of Object.entries(filters)) {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    }
     router.replace(`?${params.toString()}`);
   };
 

@@ -2,7 +2,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AdvertisementsClient } from "@/components/admin/advertisements/AdvertisementsClient";
-import { Advertisement, Company } from "@/types";
+import { Advertisement, COMPANY_PUBLIC_COLUMNS, Company } from "@/types";
 
 export const revalidate = 0;
 export const dynamic = "force-dynamic";
@@ -28,7 +28,7 @@ export default async function CompanyAdsPage({ params }: { params: Params }) {
   // 1) Empresa para título
   const { data: company, error: companyErr } = await supabase
     .from("companies")
-    .select("*")
+    .select(COMPANY_PUBLIC_COLUMNS)
     .eq("id", companyId)
     .single<Company>();
 
@@ -38,7 +38,7 @@ export default async function CompanyAdsPage({ params }: { params: Params }) {
   const { data: adsData, error: adsErr } = await supabase
     .from("advertisements")
     .select(
-      "*, advertisements_companies:advertisements_companies(companies:companies(*))"
+      `*, advertisements_companies:advertisements_companies(companies:companies(${COMPANY_PUBLIC_COLUMNS}))`
     )
     .order("created_at", { ascending: false });
 
@@ -65,6 +65,7 @@ export default async function CompanyAdsPage({ params }: { params: Params }) {
         new Map(companiesFull.map((c) => [c.id, c])).values()
       );
 
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { advertisements_companies, ...rest } = row;
 
       return {
@@ -76,7 +77,7 @@ export default async function CompanyAdsPage({ params }: { params: Params }) {
   // 4) Lista de empresas para o form continuar permitindo (des)vincular
   const { data: allCompanies, error: compsErr } = await supabase
     .from("companies")
-    .select("*")
+    .select(COMPANY_PUBLIC_COLUMNS)
     .order("name", { ascending: true });
 
   if (compsErr) {

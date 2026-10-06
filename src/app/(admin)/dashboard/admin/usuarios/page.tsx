@@ -1,5 +1,5 @@
+import { requireAdminPage } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { Profile } from "@/types";
 import { UsersClient } from "@/components/admin/users/UsersClient";
 
 // Esta função combina os dados de autenticação com os dados do perfil
@@ -35,6 +35,7 @@ async function getUsersWithProfiles() {
 }
 
 export default async function UsuariosPage() {
+  await requireAdminPage();
   const users = await getUsersWithProfiles();
 
   return (

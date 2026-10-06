@@ -14,6 +14,7 @@ import { UseFormReturn } from "react-hook-form";
 
 // ATUALIZADO: Importamos o tipo centralizado do nosso novo arquivo de schemas
 import { AdvertisementFormSchemaData } from "@/lib/schemas";
+import { ALLOWED_IMAGE_TYPES, ALLOWED_VIDEO_TYPES } from "@/lib/storage";
 
 // A interface agora usa o tipo importado, que é a fonte única da verdade
 interface ContentFieldsProps {
@@ -56,8 +57,8 @@ export function ContentFields({ form, adType }: ContentFieldsProps) {
                 type="file"
                 accept={
                   adType === AdvertisementType.IMAGE_UPLOAD
-                    ? "image/*"
-                    : `video/mp4,video/webm`
+                    ? ALLOWED_IMAGE_TYPES.join(",")
+                    : ALLOWED_VIDEO_TYPES.join(",")
                 }
                 // Ajuste para garantir que o 'value' seja limpo ao selecionar um arquivo
                 onChange={(e) => field.onChange(e.target.files)}

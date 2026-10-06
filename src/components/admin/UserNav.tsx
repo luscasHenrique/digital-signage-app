@@ -29,11 +29,13 @@ export function UserNav({ user }: UserNavProps) {
     setIsLoggingOut(true);
     const result = await logout(); // 1. Chama a action
 
-    if (result.status === "success") {
+    if (result.success) {
       toast.info(result.message); // 2. Mostra a notificação
-      router.push("/login"); // 3. AQUI ESTÁ A MÁGICA: Redireciona para /login
+      router.push("/login");
+    } else {
+      toast.error(result.message);
+      setIsLoggingOut(false);
     }
-    // Não é preciso resetar o estado de loading, pois a página será descarregada
   };
 
   return (

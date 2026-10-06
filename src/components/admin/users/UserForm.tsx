@@ -4,7 +4,6 @@
 import { createUser, updateUser } from "@/actions/users";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import {
@@ -23,22 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-// Importa os tipos centralizados
 import { UserWithProfile, UserRole } from "@/types";
-
-const userFormSchema = z.object({
-  id: z.string().optional(),
-  full_name: z.string().min(3, "O nome completo é obrigatório."),
-  email: z.string().email("O e-mail fornecido é inválido."),
-  password: z
-    .string()
-    .min(6, "A senha deve ter no mínimo 6 caracteres.")
-    .optional()
-    .or(z.literal("")),
-  role: z.nativeEnum(UserRole),
-});
-
-type UserFormData = z.infer<typeof userFormSchema>;
+import { userFormSchema, type UserFormData } from "@/lib/schemas";
 
 interface UserFormProps {
   initialData: UserWithProfile | null;
@@ -69,6 +54,7 @@ export function UserForm({ initialData, onSuccess }: UserFormProps) {
     } else {
       if (result.message && typeof result.message === "object") {
         Object.entries(result.message).forEach(([key, value]) => {
+          if (!value) return;
           if (key === "_server") {
             toast.error(value.join(", "));
           } else {

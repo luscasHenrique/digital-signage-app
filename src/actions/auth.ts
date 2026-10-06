@@ -1,16 +1,16 @@
 // src/actions/auth.ts
 "use server";
 
-import { createActionClient } from "@/lib/supabase/server"; // ATUALIZADO
+import { createActionClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-export async function login(
-  formData: FormData
-): Promise<{ status: "error" | "success"; message: string }> {
-  const supabase = createActionClient(); // ATUALIZADO
+type ActionResult = { success: boolean; message: string };
 
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
+export async function login(formData: FormData): Promise<ActionResult> {
+  const supabase = createActionClient();
+
+  const email = String(formData.get("email") ?? "");
+  const password = String(formData.get("password") ?? "");
 
   const { error } = await supabase.auth.signInWithPassword({
     email,
@@ -20,37 +20,30 @@ export async function login(
   if (error) {
     console.error("Erro no login:", error.message);
     return {
-      status: "error",
+      success: false,
       message: "Credenciais inválidas. Tente novamente.",
     };
   }
 
   revalidatePath("/", "layout");
-  return { status: "success", message: "Login bem-sucedido!" };
+  return { success: true, message: "Login bem-sucedido!" };
 }
 
-export async function logout(): Promise<{
-  status: "success" | "error"; // O status agora pode ser de erro
-  message: string;
-}> {
+export async function logout(): Promise<ActionResult> {
   const supabase = createActionClient();
 
   try {
     const { error } = await supabase.auth.signOut();
-
-    if (error) {
-      // Se houver um erro conhecido do Supabase, joga para o catch
-      throw error;
-    }
+    if (error) throw error;
 
     revalidatePath("/");
-    return { status: "success", message: "Você saiu com sucesso." };
+    return { success: true, message: "Você saiu com sucesso." };
   } catch (error) {
     console.error("ERRO NO LOGOUT:", error);
     const errorMessage =
       error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
     return {
-      status: "error",
+      success: false,
       message: `Falha ao fazer logout: ${errorMessage}`,
     };
   }

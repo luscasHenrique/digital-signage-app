@@ -2,6 +2,7 @@
 "use client";
 
 import Image from "next/image";
+import { isOptimizableImage } from "@/lib/storage";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,6 +93,7 @@ export function AdvertisementsCard({
       return (
         <Image
           src={anuncio.content_url}
+          unoptimized={!isOptimizableImage(anuncio.content_url)}
           alt={`Preview do anúncio: ${anuncio.title}`}
           fill
           className="object-cover"
@@ -109,6 +111,7 @@ export function AdvertisementsCard({
       return (
         <Image
           src={anuncio.thumbnail_url as string}
+          unoptimized={!isOptimizableImage(anuncio.thumbnail_url as string)}
           alt={`Thumbnail do anúncio: ${anuncio.title}`}
           fill
           className="object-cover"
@@ -123,6 +126,7 @@ export function AdvertisementsCard({
       return (
         <Image
           src={youtubeThumbnail}
+          unoptimized={!isOptimizableImage(youtubeThumbnail)}
           alt={`Thumbnail do vídeo: ${anuncio.title}`}
           fill
           className="object-cover"

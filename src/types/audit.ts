@@ -69,3 +69,27 @@ export function normalizeDetails(
   }
   return null;
 }
+
+/** Converte parâmetro de paginação da URL em inteiro dentro do intervalo. */
+export function parsePageParam(
+  value: string | undefined,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const n = parseInt(value ?? "", 10);
+  if (Number.isNaN(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+/**
+ * Remove caracteres com significado na sintaxe de filtros do PostgREST
+ * (vírgula, parênteses, aspas, barra invertida) e curingas do LIKE.
+ */
+export function sanitizeAuditSearchTerm(value: string | undefined): string {
+  return (value ?? "")
+    .replace(/[,()"'\\%*:]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 100);
+}

@@ -6,11 +6,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, Variants, Transition } from "framer-motion";
 import {
   Advertisement,
-  AdvertisementStatus,
   AdvertisementType,
   OverlayPosition,
 } from "@/types";
 import { createClient } from "@/lib/supabase/client";
+import { isOptimizableImage } from "@/lib/storage";
 import { FullscreenButton } from "../ui/fullscreen-button";
 
 // ---- Animações ----
@@ -40,11 +40,13 @@ const transitionSettings: Record<string, Transition> = {
 
 type AnimationType = keyof typeof animationPresets;
 
+const REFRESH_INTERVAL_MS = 30_000;
+
 interface CompanyDisplayProps {
   ads: Advertisement[];
   animationType?: AnimationType;
-  /** Informe para ativar Realtime nessa empresa (recomendado) */
-  companyId?: string;
+  companyId: string;
+  slug: string;
 }
 
 function getYoutubeEmbedUrl(url: string): string | null {
@@ -71,6 +73,7 @@ export function CompanyDisplay({
   ads,
   animationType = "fade",
   companyId,
+  slug,
 }: CompanyDisplayProps) {
   // Estado local com os anúncios atuais
   const [adList, setAdList] = useState<Advertisement[]>(ads);
@@ -113,49 +116,31 @@ export function CompanyDisplay({
     }
   }, [adList, currentIndex]);
 
-  // ---- Realtime + Refetch (opcional com companyId) ----
+  // ---- Refetch (API do servidor valida o acesso) + Realtime ----
   const refetch = useCallback(async () => {
-    if (!companyId) return;
+    try {
+      const res = await fetch(`/api/display/${encodeURIComponent(slug)}`, {
+        cache: "no-store",
+      });
 
-    const nowIso = new Date().toISOString();
+      // Senha trocada ou acesso expirado: volta para a tela de senha.
+      if (res.status === 401) {
+        window.location.href = `/display/${slug}/auth`;
+        return;
+      }
+      if (!res.ok) {
+        console.error("Erro ao buscar anúncios:", res.status);
+        return;
+      }
 
-    // 1) Busca os IDs de anúncios vinculados à empresa
-    const { data: links, error: linkErr } = await supabase
-      .from("advertisements_companies")
-      .select("advertisement_id")
-      .eq("company_id", companyId);
-
-    if (linkErr) {
-      console.error("Erro ao buscar vínculos:", linkErr);
-      return;
+      const { ads: list } = (await res.json()) as { ads: Advertisement[] };
+      setAdList(list);
+      setCurrentIndex((prev) => (list.length > 0 ? prev % list.length : 0));
+    } catch (error) {
+      // Falha de rede: mantém a lista atual na tela.
+      console.error("Erro ao buscar anúncios:", error);
     }
-
-    const ids = (links ?? []).map((l) => l.advertisement_id) as string[];
-    if (ids.length === 0) {
-      setAdList([]);
-      setCurrentIndex(0);
-      return;
-    }
-
-    // 2) Busca os anúncios válidos para exibição agora
-    const { data: adsData, error: adsErr } = await supabase
-      .from("advertisements")
-      .select("*")
-      .in("id", ids)
-      .eq("status", AdvertisementStatus.ACTIVE)
-      .lte("start_date", nowIso)
-      .gte("end_date", nowIso)
-      .order("created_at", { ascending: false });
-
-    if (adsErr) {
-      console.error("Erro ao buscar anúncios:", adsErr);
-      return;
-    }
-
-    const list = (adsData ?? []) as Advertisement[];
-    setAdList(list);
-    setCurrentIndex((prev) => (list.length > 0 ? prev % list.length : 0));
-  }, [companyId, supabase]);
+  }, [slug]);
 
   // Debounce para agrupar rajadas de eventos
   const debouncedRefetch = useMemo(() => {
@@ -169,52 +154,23 @@ export function CompanyDisplay({
     };
   }, [refetch]);
 
-  // Inscrições no Realtime (sem ler payload → sem problemas de tipagem)
+  // Realtime: a tabela display_signals recebe um "toque" (via trigger no banco)
+  // sempre que anúncios ou vínculos desta empresa mudam. Só expõe company_id/updated_at.
   useEffect(() => {
-    if (!companyId) return;
-
     const channel = supabase
       .channel(`display-realtime-${companyId}`)
-
-      // 1) Vínculos anúncio<->empresa (filtrado pela empresa)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "advertisements_companies",
+          table: "display_signals",
           filter: `company_id=eq.${companyId}`,
         },
         () => {
           debouncedRefetch();
         }
       )
-
-      // 2) Mudanças em anúncios (qualquer UPDATE/DELETE) → refetch
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "advertisements" },
-        () => {
-          debouncedRefetch();
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "advertisements" },
-        () => {
-          debouncedRefetch();
-        }
-      )
-
-      // 3) Novos anúncios (INSERT)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "advertisements" },
-        () => {
-          debouncedRefetch();
-        }
-      )
-
       .subscribe();
 
     return () => {
@@ -222,14 +178,13 @@ export function CompanyDisplay({
     };
   }, [supabase, companyId, debouncedRefetch]);
 
-  // Guard de tempo: refetch periódico para cobrir mudanças de janela (start/end)
+  // Refetch periódico: cobre a janela de datas (start/end) e falhas do Realtime.
   useEffect(() => {
-    if (!companyId) return;
     const id = setInterval(() => {
       refetch();
-    }, 60_000); // 60s (ajuste para 30_000 se quiser mais responsivo)
+    }, REFRESH_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [companyId, refetch]);
+  }, [refetch]);
 
   // ---- Render ----
   if (!adList.length) {
@@ -257,6 +212,7 @@ export function CompanyDisplay({
             fill
             className="object-cover"
             priority
+            unoptimized={!isOptimizableImage(currentAd.content_url)}
           />
         );
 

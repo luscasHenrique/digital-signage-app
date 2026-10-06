@@ -1,5 +1,5 @@
-// src/app/(admin)/dashboard/auditoria/page.tsx
-import { createClient } from "@/lib/supabase/server";
+// src/app/(admin)/dashboard/admin/auditoria/page.tsx
+import { requireAdminPage } from "@/lib/auth";
 import { Profile } from "@/types";
 import AuditClient from "@/components/admin/auditoria/AuditClient";
 import { notFound } from "next/navigation";
@@ -8,6 +8,8 @@ import {
   AuditRow,
   SearchParamsAudit,
   normalizeDetails,
+  parsePageParam,
+  sanitizeAuditSearchTerm,
   toAuditAction,
 } from "@/types/audit";
 
@@ -19,11 +21,11 @@ export default async function Page({
 }: {
   searchParams: Promise<SearchParamsAudit>;
 }) {
-  const supabase = createClient();
+  const { supabase } = await requireAdminPage();
   const sp = await searchParams;
 
-  const page = Math.max(1, parseInt(sp.page ?? "1", 10));
-  const perPage = Math.min(100, Math.max(5, parseInt(sp.perPage ?? "20", 10)));
+  const page = parsePageParam(sp.page, 1, 1, Number.MAX_SAFE_INTEGER);
+  const perPage = parsePageParam(sp.perPage, 20, 5, 100);
   const fromIdx = (page - 1) * perPage;
   const toIdx = fromIdx + perPage - 1;
 
@@ -40,8 +42,9 @@ export default async function Page({
   if (sp.action && sp.action.trim()) {
     query = query.ilike("action", `%${sp.action.trim()}%`);
   }
-  if (sp.q && sp.q.trim()) {
-    const q = sp.q.trim();
+  // O termo entra na sintaxe do filtro .or() do PostgREST: precisa ser sanitizado.
+  const q = sanitizeAuditSearchTerm(sp.q);
+  if (q) {
     query = query.or(
       [
         `table_name.ilike.%${q}%`,

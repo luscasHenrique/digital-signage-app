@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon, ImageIcon } from "lucide-react";
 import { RgbaColorPicker } from "@/components/ui/RgbaColorPicker";
+import { ALLOWED_IMAGE_TYPES } from "@/lib/storage";
 
 import {
   AdvertisementStatus,
@@ -134,13 +135,14 @@ export function AdvertisementForm({
         const signedUrlResult = await getSignedUploadUrl({
           fileName: file.name,
           fileType: file.type,
+          fileSize: file.size,
         });
         if (!signedUrlResult.success || !signedUrlResult.data) {
           toast.error(String(signedUrlResult.message));
           setIsUploading(false);
           return;
         }
-        const { url, path } = signedUrlResult.data;
+        const { url, publicUrl } = signedUrlResult.data;
 
         setUploadProgress(25);
         const uploadResponse = await fetch(url, {
@@ -153,9 +155,7 @@ export function AdvertisementForm({
           setIsUploading(false);
           return;
         }
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const bucketName = "advertisements";
-        finalContentUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${path}`;
+        finalContentUrl = publicUrl;
       }
 
       setUploadProgress(50);
@@ -169,13 +169,15 @@ export function AdvertisementForm({
           const signedThumb = await getSignedUploadUrl({
             fileName: thumbFile.name,
             fileType: thumbFile.type,
+            fileSize: thumbFile.size,
           });
           if (!signedThumb.success || !signedThumb.data) {
             toast.error(String(signedThumb.message));
             setIsUploading(false);
             return;
           }
-          const { url: thumbUrl, path: thumbPath } = signedThumb.data;
+          const { url: thumbUrl, publicUrl: thumbPublicUrl } =
+            signedThumb.data;
 
           setUploadProgress(70);
           const uploadThumbResp = await fetch(thumbUrl, {
@@ -188,9 +190,7 @@ export function AdvertisementForm({
             setIsUploading(false);
             return;
           }
-          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-          const bucketName = "advertisements";
-          finalThumbnailUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${thumbPath}`;
+          finalThumbnailUrl = thumbPublicUrl;
         }
         // Se não teve arquivo, usaremos a thumbnail_url já informada no input (validada no schema)
       }
@@ -540,7 +540,7 @@ export function AdvertisementForm({
                     <FormControl>
                       <Input
                         type="file"
-                        accept="image/*"
+                        accept={ALLOWED_IMAGE_TYPES.join(",")}
                         onChange={(e) =>
                           form.setValue(
                             "thumbnail_file",

@@ -1,34 +1,22 @@
 import type { NextConfig } from "next";
 
+const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
+  : "pbwpybwviymcxvdmqplv.supabase.co";
+
 const nextConfig: NextConfig = {
-  /* config options here */
   images: {
+    // Só hosts confiáveis passam pelo otimizador de imagens.
+    // Links externos de anúncios são renderizados com `unoptimized` (ver isOptimizableImage).
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "pbwpybwviymcxvdmqplv.supabase.co",
+        hostname: supabaseHost,
+        pathname: "/storage/v1/object/public/**",
       },
       {
         protocol: "https",
         hostname: "i.ytimg.com",
-      },
-      {
-        // ADICIONE ESTE BLOCO
-        protocol: "https",
-        hostname: "png.pngtree.com",
-      },
-      {
-        // ADICIONE ESTE NOVO BLOCO
-        protocol: "https",
-        hostname: "encrypted-tbn2.gstatic.com",
-      },
-      {
-        protocol: "https",
-        hostname: "*.gstatic.com", // O '*' permite qualquer subdomínio
-      },
-      {
-        protocol: "https",
-        hostname: "**", // O '**' permite qualquer domínio
       },
     ],
   },

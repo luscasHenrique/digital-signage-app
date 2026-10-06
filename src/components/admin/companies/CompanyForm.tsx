@@ -3,12 +3,11 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { toast } from "sonner";
 import {
   Form,
   FormControl,
-  FormDescription, // 1. Importar o FormDescription
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -18,24 +17,9 @@ import { Input } from "@/components/ui/input";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Company } from "@/types";
 import { createCompany, updateCompany } from "@/actions/companies";
+import { companySchema, type CompanyFormData } from "@/lib/schemas";
 import { Switch } from "@/components/ui/switch";
 import { useState } from "react";
-
-const companySchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(3, "O nome deve ter pelo menos 3 caracteres."),
-  slug: z
-    .string()
-    .min(3, "O slug deve ter pelo menos 3 caracteres.")
-    .regex(
-      /^[a-z0-9-]+$/,
-      "O slug deve conter apenas letras minúsculas, números e hifens."
-    ),
-  is_private: z.boolean(),
-  password: z.string().optional(),
-});
-
-type CompanyFormData = z.infer<typeof companySchema>;
 
 interface CompanyFormProps {
   initialData: Company | null;
@@ -57,9 +41,6 @@ export function CompanyForm({ initialData, onSuccess }: CompanyFormProps) {
   });
 
   const onSubmit = async (data: CompanyFormData) => {
-    if (!data.is_private) {
-      data.password = "";
-    }
     const action = initialData ? updateCompany : createCompany;
     const result = await action(data);
 
@@ -69,6 +50,7 @@ export function CompanyForm({ initialData, onSuccess }: CompanyFormProps) {
     } else {
       if (result.message && typeof result.message === "object") {
         Object.entries(result.message).forEach(([key, value]) => {
+          if (!value) return;
           if (key === "_server") toast.error(value.join(", "));
           else
             form.setError(key as keyof CompanyFormData, {

@@ -1,5 +1,5 @@
 // src/config/menuData.ts
-import { Home, Package, ShoppingCart, Users, Settings } from "lucide-react";
+import { Home, Package, ShoppingCart, Settings } from "lucide-react";
 import { UserRole } from "@/types";
 import { LucideIcon } from "lucide-react";
 

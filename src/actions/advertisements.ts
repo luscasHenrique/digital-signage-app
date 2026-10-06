@@ -1,7 +1,15 @@
 // src/actions/advertisements.ts
 "use server";
 
-import { createActionClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getAuthContext } from "@/lib/auth";
+import {
+  ADVERTISEMENTS_BUCKET,
+  extractStoragePathFromPublicUrl,
+  sanitizeFileName,
+  validateUploadFile,
+} from "@/lib/storage";
+import { diffCompanyLinks } from "@/lib/advertisement-links";
 import {
   AdvertisementStatus,
   AdvertisementType,
@@ -10,24 +18,56 @@ import {
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-function extractStoragePathFromPublicUrl(url?: string | null): string | null {
-  try {
-    if (!url) return null;
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    if (!supabaseUrl) return null;
+/** Sincroniza os vínculos anúncio↔empresa adicionando antes de remover (nunca fica sem vínculo). */
+async function syncCompanyLinks(
+  supabase: SupabaseClient,
+  advertisementId: string,
+  companyIds: string[]
+) {
+  const { data: current, error: fetchErr } = await supabase
+    .from("advertisements_companies")
+    .select("company_id")
+    .eq("advertisement_id", advertisementId);
+  if (fetchErr) throw fetchErr;
 
-    const host = new URL(supabaseUrl).host;
-    const u = new URL(url);
-    if (u.host !== host) return null; // não é do seu Supabase
+  const { toAdd, toRemove } = diffCompanyLinks(
+    (current ?? []).map((l) => l.company_id as string),
+    companyIds
+  );
 
-    const marker = "/storage/v1/object/public/advertisements/";
-    const idx = u.pathname.indexOf(marker);
-    if (idx === -1) return null;
-
-    return decodeURIComponent(u.pathname.slice(idx + marker.length)); // path relativo ao bucket
-  } catch {
-    return null;
+  if (toAdd.length > 0) {
+    const { error } = await supabase.from("advertisements_companies").insert(
+      toAdd.map((company_id) => ({
+        advertisement_id: advertisementId,
+        company_id,
+      }))
+    );
+    if (error) throw error;
   }
+
+  if (toRemove.length > 0) {
+    const { error } = await supabase
+      .from("advertisements_companies")
+      .delete()
+      .eq("advertisement_id", advertisementId)
+      .in("company_id", toRemove);
+    if (error) throw error;
+  }
+}
+
+async function removeStorageFiles(
+  supabase: SupabaseClient,
+  urls: (string | null | undefined)[]
+) {
+  const paths = urls
+    .map((url) => extractStoragePathFromPublicUrl(url))
+    .filter((p): p is string => !!p);
+  if (paths.length === 0) return;
+
+  const { error } = await supabase.storage
+    .from(ADVERTISEMENTS_BUCKET)
+    .remove(paths);
+  if (error) console.warn("Falha ao limpar arquivos do Storage:", error);
 }
 
 // ESQUEMA DO SERVIDOR (ACTION SCHEMA)
@@ -100,31 +140,26 @@ const actionSchema = z
     }
   });
 
-// ACTION PARA CRIAR ANÚNCIO
-// Agora ela recebe um objeto JSON (sem FormData)
-export async function createAdvertisement(data: z.infer<typeof actionSchema>) {
-  const supabase = createActionClient();
-  const validation = actionSchema.safeParse(data);
+type ActionInput = z.infer<typeof actionSchema>;
 
+// ACTION PARA CRIAR ANÚNCIO
+export async function createAdvertisement(data: ActionInput) {
+  const validation = actionSchema.safeParse(data);
   if (!validation.success) {
     return { success: false, message: validation.error.flatten().fieldErrors };
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user)
-    return { success: false, message: { _server: ["Não autenticado"] } };
+  const ctx = await getAuthContext();
+  if (!ctx) return { success: false, message: { _server: ["Não autenticado"] } };
+  const { supabase, user } = ctx;
 
   const { company_ids, ...adData } = validation.data;
 
   try {
-    // Passo 1: Inserir o anúncio e tentar selecionar o ID de volta
     const { data: newAdArray, error: adError } = await supabase
       .from("advertisements")
       .insert({ ...adData, created_by: user.id })
-      .select("id"); // Removido .single() para mais resiliência
-
+      .select("id");
     if (adError) throw adError;
 
     const newAd = newAdArray?.[0];
@@ -134,46 +169,35 @@ export async function createAdvertisement(data: z.infer<typeof actionSchema>) {
       );
     }
 
-    // Passo 2: Associar as empresas na tabela de junção
-    const associations = company_ids.map((company_id) => ({
-      advertisement_id: newAd.id,
-      company_id,
-    }));
-
-    const { error: assocError } = await supabase
-      .from("advertisements_companies")
-      .insert(associations);
-
-    if (assocError) throw assocError;
+    try {
+      await syncCompanyLinks(supabase, newAd.id, company_ids);
+    } catch (linkError) {
+      // Desfaz a criação para não deixar anúncio órfão (sem empresas).
+      await supabase.from("advertisements").delete().eq("id", newAd.id);
+      throw linkError;
+    }
 
     revalidatePath("/dashboard/anuncios");
     return { success: true, message: "Anúncio criado com sucesso!" };
   } catch (error) {
     console.error("ERRO DETALHADO AO CRIAR ANÚNCIO:", error);
-
-    const errorMessage =
-      error instanceof Error ? error.message : "Erro desconhecido.";
     return {
       success: false,
-      message: { _server: [`Falha ao criar anúncio: ${errorMessage}`] },
+      message: { _server: [`Falha ao criar anúncio: ${errorMessage(error)}`] },
     };
   }
 }
 
 // ACTION PARA ATUALIZAR ANÚNCIO
-export async function updateAdvertisement(data: z.infer<typeof actionSchema>) {
-  const supabase = createActionClient();
+export async function updateAdvertisement(data: ActionInput) {
   const validation = actionSchema.safeParse(data);
   if (!validation.success) {
     return { success: false, message: validation.error.flatten().fieldErrors };
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { success: false, message: { _server: ["Não autenticado"] } };
-  }
+  const ctx = await getAuthContext();
+  if (!ctx) return { success: false, message: { _server: ["Não autenticado"] } };
+  const { supabase, user } = ctx;
 
   const { id, company_ids, ...adData } = validation.data;
   if (!id) {
@@ -184,7 +208,7 @@ export async function updateAdvertisement(data: z.infer<typeof actionSchema>) {
   }
 
   try {
-    // 1) Carrega URLs antigas para comparar
+    // URLs antigas, para limpar arquivos substituídos
     const { data: oldAd, error: fetchErr } = await supabase
       .from("advertisements")
       .select("content_url, thumbnail_url")
@@ -192,161 +216,108 @@ export async function updateAdvertisement(data: z.infer<typeof actionSchema>) {
       .single();
     if (fetchErr) throw fetchErr;
 
-    // 2) Atualiza o registro
     const { error: adError } = await supabase
       .from("advertisements")
       .update({ ...adData, last_edited_by: user.id })
       .eq("id", id);
     if (adError) throw adError;
 
-    // 3) Sincroniza empresas
-    const { error: deleteLinkError } = await supabase
-      .from("advertisements_companies")
-      .delete()
-      .eq("advertisement_id", id);
-    if (deleteLinkError) throw deleteLinkError;
+    await syncCompanyLinks(supabase, id, company_ids);
 
-    const links = company_ids.map((company_id) => ({
-      advertisement_id: id,
-      company_id,
-    }));
-    const { error: insertLinkError } = await supabase
-      .from("advertisements_companies")
-      .insert(links);
-    if (insertLinkError) throw insertLinkError;
-
-    // 4) Best-effort: remove arquivos antigos se foram trocados e eram do seu Storage
-    const pathsToRemove: string[] = [];
-    if (oldAd?.content_url && oldAd.content_url !== adData.content_url) {
-      const p = extractStoragePathFromPublicUrl(oldAd.content_url);
-      if (p) pathsToRemove.push(p);
-    }
-    if (oldAd?.thumbnail_url && oldAd.thumbnail_url !== adData.thumbnail_url) {
-      const p = extractStoragePathFromPublicUrl(oldAd.thumbnail_url);
-      if (p) pathsToRemove.push(p);
-    }
-    if (pathsToRemove.length > 0) {
-      const { error: storageErr } = await supabase.storage
-        .from("advertisements")
-        .remove(pathsToRemove);
-      if (storageErr)
-        console.warn("Falha ao limpar arquivos antigos:", storageErr);
-    }
+    // Best-effort: remove arquivos antigos que foram trocados
+    await removeStorageFiles(supabase, [
+      oldAd?.content_url !== adData.content_url ? oldAd?.content_url : null,
+      oldAd?.thumbnail_url !== adData.thumbnail_url
+        ? oldAd?.thumbnail_url
+        : null,
+    ]);
 
     revalidatePath("/dashboard/anuncios");
     return { success: true, message: "Anúncio atualizado com sucesso!" };
   } catch (error) {
     console.error("ERRO DETALHADO AO ATUALIZAR ANÚNCIO:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Erro desconhecido.";
     return {
       success: false,
-      message: { _server: [`Falha ao atualizar anúncio: ${errorMessage}`] },
+      message: {
+        _server: [`Falha ao atualizar anúncio: ${errorMessage(error)}`],
+      },
     };
   }
 }
 
 // ACTION PARA ELIMINAR ANÚNCIO
 export async function deleteAdvertisement(adId: string) {
-  const supabase = createActionClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { success: false, message: "Não autenticado." };
+  const ctx = await getAuthContext();
+  if (!ctx) return { success: false, message: "Não autenticado." };
   if (!adId) return { success: false, message: "ID do anúncio não fornecido." };
+  const { supabase } = ctx;
 
   try {
-    // 1) Buscar URLs para limpeza do Storage
     const { data: ad, error: fetchErr } = await supabase
       .from("advertisements")
-      .select("id, type, content_url, thumbnail_url")
+      .select("id, content_url, thumbnail_url")
       .eq("id", adId)
       .single();
     if (fetchErr) throw fetchErr;
 
-    // 2) Apagar o registro no banco
     const { error: delDbErr } = await supabase
       .from("advertisements")
       .delete()
       .eq("id", adId);
     if (delDbErr) throw delDbErr;
 
-    // 3) Best-effort: remover arquivos do bucket se forem do seu Supabase
-    const pathsToRemove: string[] = [];
-    const mainPath = extractStoragePathFromPublicUrl(
-      ad?.content_url ?? undefined
-    );
-    const thumbPath = extractStoragePathFromPublicUrl(
-      ad?.thumbnail_url ?? undefined
-    );
-    if (mainPath) pathsToRemove.push(mainPath);
-    if (thumbPath) pathsToRemove.push(thumbPath);
-
-    if (pathsToRemove.length > 0) {
-      const { error: storageErr } = await supabase.storage
-        .from("advertisements") // ajuste se seu bucket tiver outro nome
-        .remove(pathsToRemove);
-      if (storageErr) {
-        console.warn("Falha ao limpar arquivos do Storage:", storageErr);
-      }
-    }
+    // Best-effort: remover arquivos do bucket
+    await removeStorageFiles(supabase, [ad?.content_url, ad?.thumbnail_url]);
 
     revalidatePath("/dashboard/anuncios");
     return { success: true, message: "Anúncio deletado com sucesso!" };
   } catch (error) {
     console.error("ERRO DETALHADO AO DELETAR ANÚNCIO:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Erro ao deletar anúncio.";
-    return { success: false, message: errorMessage };
+    return {
+      success: false,
+      message: errorMessage(error, "Erro ao deletar anúncio."),
+    };
   }
 }
 
-// NOVA ACTION: Para gerar a URL de Upload Segura
+// Gera URL assinada para o navegador enviar o arquivo direto ao Storage
 export async function getSignedUploadUrl({
   fileName,
   fileType,
+  fileSize,
 }: {
   fileName: string;
   fileType: string;
+  fileSize: number;
 }) {
-  const supabase = createActionClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const ctx = await getAuthContext();
+  if (!ctx) return { success: false, message: "Não autenticado." };
 
-  if (!user) {
-    return { success: false, message: "Não autenticado." };
-  }
+  const invalid = validateUploadFile({ type: fileType, size: fileSize });
+  if (invalid) return { success: false, message: invalid };
 
-  // Cria um nome de arquivo único para evitar conflitos
-  const path = `${user.id}/${Date.now()}-${fileName.replace(/\s/g, "_")}`;
+  const path = `${ctx.user.id}/${Date.now()}-${sanitizeFileName(fileName)}`;
 
   try {
-    // Objeto de opções com todas as configurações necessárias
-    const uploadOptions = {
-      upsert: true, // Permite substituir um arquivo com o mesmo nome (opcional)
-      contentType: fileType, // Especifica o tipo de arquivo para o qual a URL é válida
-      expiresIn: 60, // Define o tempo de validade da URL em segundos
-    };
-
-    // Chamada corrigida com 2 argumentos: o caminho e o objeto de opções
-    const { data, error } = await supabase.storage
-      .from("advertisements") // VERIFIQUE: Este é o nome do seu bucket
-      .createSignedUploadUrl(path, uploadOptions);
-
+    const bucket = ctx.supabase.storage.from(ADVERTISEMENTS_BUCKET);
+    const { data, error } = await bucket.createSignedUploadUrl(path);
     if (error) throw error;
 
-    // Retorna a URL assinada e o caminho do arquivo
+    const {
+      data: { publicUrl },
+    } = bucket.getPublicUrl(path);
+
     return {
       success: true,
       message: "URL gerada com sucesso.",
-      data: { url: data.signedUrl, path },
+      data: { url: data.signedUrl, path, publicUrl },
     };
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Erro desconhecido.";
-    console.error("Erro ao gerar URL de upload:", errorMessage);
+    console.error("Erro ao gerar URL de upload:", errorMessage(error));
     return { success: false, message: "Falha ao gerar URL de upload." };
   }
+}
+
+function errorMessage(error: unknown, fallback = "Erro desconhecido."): string {
+  return error instanceof Error ? error.message : fallback;
 }

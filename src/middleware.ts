@@ -1,9 +1,9 @@
-"use server";
-
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { jwtVerify } from "jose";
 
+// Mantém a sessão do Supabase atualizada e protege o painel.
+// Papéis (ADMIN) são verificados nas páginas e Server Actions (src/lib/auth.ts);
+// o acesso a displays privados é verificado em src/lib/display.ts.
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request: {
@@ -33,73 +33,28 @@ export async function middleware(request: NextRequest) {
   });
 
   try {
+    // getUser() valida o token no servidor do Supabase (getSession() não valida).
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+    } = await supabase.auth.getUser();
     const { pathname } = request.nextUrl;
 
-    // Lógica de proteção para o /dashboard
-    if (!session && pathname.startsWith("/dashboard")) {
+    if (!user && pathname.startsWith("/dashboard")) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
-    if (session && pathname === "/login") {
+    if (user && pathname === "/login") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
-
-    // Lógica para proteger páginas de display
-    if (pathname.startsWith("/display/")) {
-      const slug = pathname.split("/")[2];
-      if (!slug) return response;
-
-      const { data: company } = await supabase
-        .from("companies")
-        .select("is_private")
-        .eq("slug", slug)
-        .single();
-
-      if (company?.is_private) {
-        const tokenCookie = request.cookies.get(`access_token_${slug}`);
-        let hasValidToken = false;
-
-        if (tokenCookie) {
-          try {
-            const secret = new TextEncoder().encode(
-              process.env.JWT_SECRET_KEY!
-            );
-            await jwtVerify(tokenCookie.value, secret);
-            hasValidToken = true;
-          } catch (err) {
-            // Token inválido, hasValidToken permanece false
-          }
-        }
-
-        const isOnAuthPage = pathname.endsWith("/auth");
-
-        // REGRA CORRIGIDA:
-        // 1. Se o usuário já tem um token válido mas está na página de senha,
-        // redireciona para a página de conteúdo.
-        if (hasValidToken && isOnAuthPage) {
-          return NextResponse.redirect(
-            new URL(`/display/${slug}`, request.url)
-          );
-        }
-
-        // 2. Se o usuário NÃO tem um token válido e NÃO está na página de senha,
-        // redireciona para a página de senha.
-        if (!hasValidToken && !isOnAuthPage) {
-          return NextResponse.redirect(
-            new URL(`/display/${slug}/auth`, request.url)
-          );
-        }
-      }
     }
   } catch (error) {
     console.error("Erro no middleware:", error);
+    if (request.nextUrl.pathname.startsWith("/dashboard")) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
   }
 
   return response;
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/dashboard/:path*", "/login"],
 };

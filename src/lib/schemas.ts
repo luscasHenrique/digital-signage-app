@@ -4,7 +4,9 @@ import {
   AdvertisementStatus,
   AdvertisementType,
   OverlayPosition,
+  UserRole,
 } from "@/types";
+import { validateUploadFile } from "@/lib/storage";
 
 export const advertisementFormSchema = z
   .object({
@@ -127,28 +129,39 @@ export const advertisementFormSchema = z
       data.thumbnail_file.length > 0
     ) {
       const file = data.thumbnail_file[0];
-      if (!file.type.startsWith("image/")) {
+      const uploadError = file.type.startsWith("image/")
+        ? validateUploadFile(file)
+        : "O arquivo da thumbnail deve ser uma imagem.";
+      if (uploadError) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["thumbnail_file"],
-          message: "O arquivo da thumbnail deve ser uma imagem.",
+          message: uploadError,
         });
       }
     }
 
-    // 3. Valida arquivo de conteúdo principal (se for IMAGE_UPLOAD, verifica se é imagem)
+    // 3. Valida arquivo de conteúdo principal (tipo e tamanho)
     if (
-      data.type === AdvertisementType.IMAGE_UPLOAD &&
+      (data.type === AdvertisementType.IMAGE_UPLOAD ||
+        data.type === AdvertisementType.VIDEO_UPLOAD) &&
       data.content_file &&
       data.content_file instanceof FileList &&
       data.content_file.length > 0
     ) {
       const file = data.content_file[0];
-      if (!file.type.startsWith("image/")) {
+      const expectedPrefix =
+        data.type === AdvertisementType.IMAGE_UPLOAD ? "image/" : "video/";
+      const uploadError = file.type.startsWith(expectedPrefix)
+        ? validateUploadFile(file)
+        : data.type === AdvertisementType.IMAGE_UPLOAD
+          ? "O arquivo de conteúdo deve ser uma imagem."
+          : "O arquivo de conteúdo deve ser um vídeo.";
+      if (uploadError) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["content_file"],
-          message: "O arquivo de conteúdo deve ser uma imagem.",
+          message: uploadError,
         });
       }
     }
@@ -158,3 +171,52 @@ export const advertisementFormSchema = z
 export type AdvertisementFormSchemaData = z.infer<
   typeof advertisementFormSchema
 >;
+
+/* =========================
+   EMPRESAS
+   ========================= */
+
+export const companySchema = z
+  .object({
+    id: z.string().optional(),
+    name: z.string().min(3, "O nome deve ter pelo menos 3 caracteres."),
+    slug: z
+      .string()
+      .min(3, "O slug deve ter pelo menos 3 caracteres.")
+      .regex(
+        /^[a-z0-9-]+$/,
+        "O slug deve conter apenas letras minúsculas, números e hifens."
+      ),
+    is_private: z.boolean(),
+    // Em edição, vazio significa "manter a senha atual".
+    password: z
+      .string()
+      .min(4, "A senha deve ter no mínimo 4 caracteres.")
+      .optional()
+      .or(z.literal("")),
+  })
+  .refine((data) => !(data.is_private && !data.id && !data.password), {
+    message: "Defina uma senha para a página privada.",
+    path: ["password"],
+  });
+
+export type CompanyFormData = z.infer<typeof companySchema>;
+
+/* =========================
+   USUÁRIOS
+   ========================= */
+
+export const userFormSchema = z.object({
+  id: z.string().optional(),
+  full_name: z.string().trim().min(3, "O nome completo é obrigatório."),
+  email: z.string().email("O e-mail fornecido é inválido."),
+  // Em edição, vazio significa "manter a senha atual".
+  password: z
+    .string()
+    .min(6, "A senha deve ter no mínimo 6 caracteres.")
+    .optional()
+    .or(z.literal("")),
+  role: z.nativeEnum(UserRole),
+});
+
+export type UserFormData = z.infer<typeof userFormSchema>;

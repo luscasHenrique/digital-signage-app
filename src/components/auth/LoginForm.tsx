@@ -43,7 +43,7 @@ export function LoginForm({ message }: { message?: string }) {
     const result = await login(formData);
 
     // Exibe o toast e redireciona com base no resultado da action
-    if (result.status === "success") {
+    if (result.success) {
       toast.success(result.message);
       router.push("/dashboard");
     } else {

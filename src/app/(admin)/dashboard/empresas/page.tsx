@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { COMPANY_PUBLIC_COLUMNS } from "@/types";
 import { CompaniesClient } from "@/components/admin/companies/CompaniesClient";
 
 export default async function EmpresasPage() {
@@ -6,7 +7,7 @@ export default async function EmpresasPage() {
 
   const { data: companies, error } = await supabase
     .from("companies")
-    .select("*")
+    .select(COMPANY_PUBLIC_COLUMNS)
     .order("name", { ascending: true });
 
   // CORREÇÃO: Lança um erro para ativar o error.tsx
