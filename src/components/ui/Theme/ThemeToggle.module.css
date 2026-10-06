@@ -1,0 +1,52 @@
+.toggle {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--lg-text);
+  background: var(--lg-glass-bg);
+  -webkit-backdrop-filter: var(--lg-glass-filter);
+  backdrop-filter: var(--lg-glass-filter);
+  box-shadow: var(--lg-glass-shadow);
+  overflow: hidden;
+  transition:
+    transform var(--lg-duration-base) var(--lg-ease-spring),
+    background var(--lg-duration-fast) ease;
+}
+
+.bare {
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.toggle:hover {
+  background: var(--lg-fill);
+}
+
+.toggle:active {
+  transform: scale(0.9);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--lg-accent);
+  outline-offset: 2px;
+}
+
+.sun,
+.moon {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  transition:
+    transform var(--lg-duration-slow) var(--lg-ease-spring),
+    opacity var(--lg-duration-base) ease;
+}
+
+.toggle[data-theme-state="light"] .moon,
+.toggle[data-theme-state="dark"] .sun {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.4);
+}

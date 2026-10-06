@@ -18,6 +18,10 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      // Design system Liquid Glass: copiado do repositório liquid-glass-ui e
+      // verificado lá (usa regras do eslint-config-next 16).
+      "src/components/ui/**",
+      "src/styles/**",
     ],
   },
 ];

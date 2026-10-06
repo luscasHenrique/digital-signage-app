@@ -1,0 +1,311 @@
+/* ==========================================================================
+   Field — estrutura compartilhada por todos os inputs
+   (label, controle, hint, erro, contador)
+   ========================================================================== */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-family: var(--lg-font-sans);
+}
+
+.labelRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--lg-space-2);
+  margin-bottom: 6px;
+}
+
+.label {
+  font-size: var(--lg-text-sm);
+  font-weight: var(--lg-weight-medium);
+  color: var(--lg-text-secondary);
+  padding-inline: 2px;
+}
+
+.required {
+  color: var(--lg-danger);
+  margin-left: 2px;
+}
+
+.optional {
+  color: var(--lg-text-tertiary);
+  font-weight: var(--lg-weight-regular);
+  margin-left: 4px;
+}
+
+/* ---------- Mensagens (hint / erro / sucesso) ---------- */
+.messageRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--lg-space-2);
+  padding-inline: 2px;
+  font-size: var(--lg-text-xs);
+  line-height: 1.4;
+}
+
+.messageCollapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    grid-template-rows var(--lg-duration-base) var(--lg-ease-out),
+    opacity var(--lg-duration-base) var(--lg-ease-out),
+    transform var(--lg-duration-base) var(--lg-ease-out);
+  flex: 1;
+  min-width: 0;
+}
+
+.messageCollapse[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: none;
+}
+
+.messageInner {
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  padding-top: 6px;
+}
+
+.messageInner > svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.hint {
+  color: var(--lg-text-tertiary);
+}
+.error {
+  color: var(--lg-danger);
+  font-weight: var(--lg-weight-medium);
+}
+.success {
+  color: var(--lg-success);
+  font-weight: var(--lg-weight-medium);
+}
+
+.meta {
+  margin-left: auto;
+  color: var(--lg-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  padding-top: 6px;
+}
+
+/* ==========================================================================
+   Controle (casca de vidro usada por TextField, Textarea, Select)
+   ========================================================================== */
+
+.control {
+  --field-h: var(--lg-control-md);
+  --field-px: 12px;
+  --field-ring: var(--lg-field-border);
+
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--lg-space-2);
+  min-height: var(--field-h);
+  padding-inline: var(--field-px);
+  border-radius: var(--lg-radius-md);
+  background: var(--lg-field-bg);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+  box-shadow:
+    inset 0 0 0 1px var(--field-ring),
+    inset 0 1px 2px rgba(0, 0, 0, 0.03);
+  color: var(--lg-text);
+  cursor: text;
+  transition:
+    background var(--lg-duration-fast) ease,
+    box-shadow var(--lg-duration-base) var(--lg-ease-out);
+}
+
+.control:hover {
+  --field-ring: var(--lg-field-border-hover);
+  background: var(--lg-field-bg-hover);
+}
+
+.control:focus-within {
+  --field-ring: var(--lg-focus-border);
+  background: var(--lg-field-bg-focus);
+  box-shadow:
+    inset 0 0 0 1px var(--field-ring),
+    inset 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.control[data-size="sm"] {
+  --field-h: var(--lg-control-sm);
+  --field-px: 10px;
+  border-radius: var(--lg-radius-sm);
+}
+.control[data-size="lg"] {
+  --field-h: var(--lg-control-lg);
+  --field-px: 16px;
+}
+
+.control[data-invalid="true"] {
+  --field-ring: var(--lg-danger-border);
+  animation: lg-shake 0.42s var(--lg-ease-out);
+}
+.control[data-invalid="true"]:focus-within {
+  box-shadow:
+    inset 0 0 0 1px var(--lg-danger-border),
+    inset 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.control[data-success="true"] {
+  --field-ring: var(--lg-success);
+}
+
+.control[data-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: var(--field-h);
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font-size: var(--lg-text-md);
+  letter-spacing: -0.01em;
+}
+
+.control[data-size="sm"] .input {
+  font-size: var(--lg-text-sm);
+}
+.control[data-size="lg"] .input {
+  font-size: var(--lg-text-lg);
+}
+
+.input::placeholder {
+  color: var(--lg-field-placeholder);
+  opacity: 1;
+}
+
+/* Remove decorações nativas */
+.input::-webkit-search-cancel-button,
+.input::-webkit-search-decoration,
+.input::-ms-reveal,
+.input::-ms-clear {
+  display: none;
+  -webkit-appearance: none;
+}
+.input[type="number"]::-webkit-inner-spin-button,
+.input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.input[type="number"] {
+  -moz-appearance: textfield;
+}
+.input:-webkit-autofill {
+  -webkit-text-fill-color: var(--lg-text);
+  transition: background-color 9999s ease-out;
+}
+
+.adornment {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--lg-text-tertiary);
+  transition:
+    color var(--lg-duration-fast) ease,
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+
+.adornment > svg {
+  width: 18px;
+  height: 18px;
+}
+
+.control:focus-within .adornmentStart {
+  color: var(--lg-accent);
+}
+.control[data-invalid="true"] .adornmentStart {
+  color: var(--lg-danger);
+}
+
+.statusIcon {
+  display: inline-flex;
+  animation: lg-pop var(--lg-duration-base) var(--lg-ease-spring);
+}
+.statusIcon[data-tone="danger"] {
+  color: var(--lg-danger);
+}
+.statusIcon[data-tone="success"] {
+  color: var(--lg-success);
+}
+
+/* Botões internos (limpar, mostrar senha) */
+.inlineAction {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-inline: -4px;
+  border-radius: var(--lg-radius-full);
+  color: var(--lg-text-tertiary);
+  cursor: pointer;
+  transition:
+    background var(--lg-duration-fast) ease,
+    color var(--lg-duration-fast) ease,
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+.inlineAction:hover {
+  background: var(--lg-fill);
+  color: var(--lg-text);
+}
+.inlineAction:active {
+  transform: scale(0.88);
+}
+.inlineAction:focus-visible {
+  outline: 2px solid var(--lg-accent);
+  outline-offset: 1px;
+}
+
+.clearAppear {
+  animation: lg-pop var(--lg-duration-base) var(--lg-ease-spring);
+}
+
+@keyframes lg-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}
+
+@keyframes lg-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

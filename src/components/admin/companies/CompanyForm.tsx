@@ -1,34 +1,34 @@
 // src/components/admin/companies/CompanyForm.tsx
 "use client";
 
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { LoadingButton } from "@/components/ui/loading-button";
-import { Company } from "@/types";
 import { createCompany, updateCompany } from "@/actions/companies";
+import { Button } from "@/components/ui/Button/Button";
+import { Switch } from "@/components/ui/Switch/Switch";
+import { TextField } from "@/components/ui/TextField/TextField";
+import { useToast } from "@/components/ui/Toast/Toast";
+import { applyActionErrors } from "@/lib/form-errors";
 import { companySchema, type CompanyFormData } from "@/lib/schemas";
-import { Switch } from "@/components/ui/switch";
-import { useState } from "react";
+import { Company } from "@/types";
 
 interface CompanyFormProps {
   initialData: Company | null;
   onSuccess: () => void;
 }
 
-export function CompanyForm({ initialData, onSuccess }: CompanyFormProps) {
-  const [isPrivate, setIsPrivate] = useState(initialData?.is_private || false);
+/** Gera um slug a partir do nome: "Loja São José" → "loja-sao-jose". */
+function slugify(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
+export function CompanyForm({ initialData, onSuccess }: CompanyFormProps) {
+  const toast = useToast();
   const form = useForm<CompanyFormData>({
     resolver: zodResolver(companySchema),
     defaultValues: {
@@ -39,112 +39,105 @@ export function CompanyForm({ initialData, onSuccess }: CompanyFormProps) {
       password: "",
     },
   });
+  const { errors, isSubmitting, dirtyFields } = form.formState;
+  const isPrivate = form.watch("is_private");
 
   const onSubmit = async (data: CompanyFormData) => {
     const action = initialData ? updateCompany : createCompany;
     const result = await action(data);
 
     if (result.success) {
-      if (typeof result.message === "string") toast.success(result.message);
+      toast.success(result.message);
       onSuccess();
     } else {
-      if (result.message && typeof result.message === "object") {
-        Object.entries(result.message).forEach(([key, value]) => {
-          if (!value) return;
-          if (key === "_server") toast.error(value.join(", "));
-          else
-            form.setError(key as keyof CompanyFormData, {
-              message: value.join(", "),
-            });
-        });
-      }
+      applyActionErrors(result.message, form.setError, toast.error);
     }
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nome da Empresa</FormLabel>
-              <FormControl>
-                <Input placeholder="Ex: Minha Empresa" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="slug"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Slug da URL</FormLabel>
-              <FormControl>
-                <Input placeholder="Ex: minha-empresa" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="is_private"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-              <div className="space-y-0.5">
-                <FormLabel className="text-base">Página Privada</FormLabel>
-                <FormDescription>
-                  Marque para exigir uma senha de acesso a esta página de
-                  anúncios.
-                </FormDescription>
-              </div>
-              <FormControl>
-                <Switch
-                  checked={field.value}
-                  onCheckedChange={(checked) => {
-                    field.onChange(checked);
-                    setIsPrivate(checked);
-                  }}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-        {isPrivate && (
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Senha de Acesso</FormLabel>
-                <FormControl>
-                  <Input
-                    type="password"
-                    placeholder={
-                      initialData
-                        ? "Deixe em branco para não alterar"
-                        : "Senha para a página"
-                    }
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+    <form
+      onSubmit={form.handleSubmit(onSubmit)}
+      className="flex flex-col gap-5"
+      noValidate
+    >
+      <Controller
+        control={form.control}
+        name="name"
+        render={({ field }) => (
+          <TextField
+            {...field}
+            label="Nome da empresa"
+            placeholder="Ex.: Loja Centro"
+            required
+            error={errors.name?.message}
+            onChange={(e) => {
+              field.onChange(e);
+              // Sugere o slug enquanto o usuário não o editou manualmente
+              if (!initialData && !dirtyFields.slug) {
+                form.setValue("slug", slugify(e.target.value));
+              }
+            }}
           />
         )}
-        <LoadingButton
-          type="submit"
-          loading={form.formState.isSubmitting}
-          className="w-full"
-        >
-          {initialData ? "Salvar Alterações" : "Criar Empresa"}
-        </LoadingButton>
-      </form>
-    </Form>
+      />
+
+      <Controller
+        control={form.control}
+        name="slug"
+        render={({ field }) => (
+          <TextField
+            {...field}
+            label="Endereço da tela"
+            placeholder="loja-centro"
+            required
+            leftIcon={<span className="text-sm">/display/</span>}
+            hint="Apenas letras minúsculas, números e hífens."
+            error={errors.slug?.message}
+          />
+        )}
+      />
+
+      <Controller
+        control={form.control}
+        name="is_private"
+        render={({ field }) => (
+          <Switch
+            name={field.name}
+            checked={field.value}
+            onChange={(e) => field.onChange(e.target.checked)}
+            onBlur={field.onBlur}
+            label="Página privada"
+            description="Exige uma senha para abrir a tela desta empresa."
+          />
+        )}
+      />
+
+      {isPrivate && (
+        <Controller
+          control={form.control}
+          name="password"
+          render={({ field }) => (
+            <TextField
+              {...field}
+              value={field.value ?? ""}
+              type="password"
+              autoComplete="new-password"
+              label="Senha de acesso"
+              placeholder={
+                initialData?.is_private
+                  ? "Deixe em branco para não alterar"
+                  : "Senha para a página"
+              }
+              required={!initialData?.is_private}
+              error={errors.password?.message}
+            />
+          )}
+        />
+      )}
+
+      <Button type="submit" fullWidth size="lg" loading={isSubmitting}>
+        {initialData ? "Salvar alterações" : "Criar empresa"}
+      </Button>
+    </form>
   );
 }

@@ -1,0 +1,9 @@
+/* Texto herdado acompanha o tema do escopo */
+.scope {
+  color: var(--lg-text);
+}
+
+/* Wrapper de Portal: não gera caixa, só propaga os tokens */
+.contents {
+  display: contents;
+}

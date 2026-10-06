@@ -4,14 +4,12 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, Variants, Transition } from "framer-motion";
-import {
-  Advertisement,
-  AdvertisementType,
-  OverlayPosition,
-} from "@/types";
+import { Advertisement, AdvertisementType, OverlayPosition } from "@/types";
 import { createClient } from "@/lib/supabase/client";
 import { isOptimizableImage } from "@/lib/storage";
-import { FullscreenButton } from "../ui/fullscreen-button";
+import { getYoutubeEmbedUrl } from "@/lib/advertisement-display";
+import { ThemeScope } from "@/components/ui/Theme/ThemeScope";
+import { FullscreenButton } from "./FullscreenButton";
 
 // ---- Animações ----
 const animationPresets: Record<string, Variants> = {
@@ -47,26 +45,6 @@ interface CompanyDisplayProps {
   animationType?: AnimationType;
   companyId: string;
   slug: string;
-}
-
-function getYoutubeEmbedUrl(url: string): string | null {
-  try {
-    const urlObj = new URL(url);
-    let videoId: string | null = null;
-    if (urlObj.hostname === "youtu.be") {
-      videoId = urlObj.pathname.slice(1);
-    } else if (
-      urlObj.hostname === "www.youtube.com" ||
-      urlObj.hostname === "youtube.com"
-    ) {
-      videoId = urlObj.searchParams.get("v");
-    }
-    return videoId
-      ? `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0&rel=0`
-      : null;
-  } catch {
-    return null;
-  }
 }
 
 export function CompanyDisplay({
@@ -189,9 +167,11 @@ export function CompanyDisplay({
   // ---- Render ----
   if (!adList.length) {
     return (
-      <main className="h-screen w-screen bg-black grid place-items-center text-white">
-        Nenhum anúncio ativo no momento.
-      </main>
+      <ThemeScope theme="dark">
+        <main className="grid h-dvh w-screen place-items-center bg-black text-[var(--lg-text-secondary)]">
+          Nenhum anúncio ativo no momento.
+        </main>
+      </ThemeScope>
     );
   }
 
@@ -256,59 +236,62 @@ export function CompanyDisplay({
   };
 
   return (
-    <main
-      id="fullscreen-display"
-      className="h-screen w-screen bg-black relative overflow-hidden text-white"
-    >
-      <AnimatePresence>
-        <motion.div
-          key={currentAd?.id}
-          className="absolute inset-0 z-0"
-          variants={selectedAnimation}
-          initial="initial"
-          animate="animate"
-          exit="exit"
-          transition={selectedTransition}
-        >
-          {renderAdContent()}
-        </motion.div>
-      </AnimatePresence>
+    <ThemeScope theme="dark">
+      <main
+        id="fullscreen-display"
+        className="relative h-dvh w-screen overflow-hidden bg-black text-white"
+      >
+        <AnimatePresence>
+          <motion.div
+            key={currentAd?.id}
+            className="absolute inset-0 z-0"
+            variants={selectedAnimation}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={selectedTransition}
+          >
+            {renderAdContent()}
+          </motion.div>
+        </AnimatePresence>
 
-      {currentAd?.overlay_text && (
-        <div
-          className={`absolute w-full p-4 text-center text-2xl font-bold z-10 ${
-            currentAd.overlay_position === OverlayPosition.TOP
-              ? "top-0"
-              : "bottom-0"
-          }`}
-          style={{
-            backgroundColor: currentAd.overlay_bg_color || "rgba(0,0,0,0.5)",
-            color: currentAd.overlay_text_color || "white",
-          }}
-        >
-          {currentAd.overlay_text}
-        </div>
-      )}
+        {currentAd?.overlay_text && (
+          <div
+            className={`absolute w-full p-4 text-center text-2xl font-bold z-10 ${
+              currentAd.overlay_position === OverlayPosition.TOP
+                ? "top-0"
+                : "bottom-0"
+            }`}
+            style={{
+              backgroundColor: currentAd.overlay_bg_color || "rgba(0,0,0,0.5)",
+              color: currentAd.overlay_text_color || "white",
+            }}
+          >
+            {currentAd.overlay_text}
+          </div>
+        )}
 
-      <div className="absolute top-5 right-5 bg-black/50 p-3 rounded-lg text-center z-20">
-        <div className="text-4xl font-bold">
-          {now.toLocaleTimeString("pt-BR", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
+        <div className="absolute right-5 top-5 z-20">
+          {/* Vidro "strong": legível sobre qualquer imagem, clara ou escura */}
+          <div className="lg-glass-strong rounded-[var(--lg-radius-xl)] px-5 py-3 text-center">
+            <div className="text-4xl font-bold tabular-nums tracking-[var(--lg-tracking-tight)]">
+              {now.toLocaleTimeString("pt-BR", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </div>
+            <div className="text-sm text-[var(--lg-text-secondary)] first-letter:uppercase">
+              {now.toLocaleDateString("pt-BR", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+              })}
+            </div>
+          </div>
         </div>
-        <div className="text-sm normal-case">
-          {now.toLocaleDateString("pt-BR", {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-          })}
-        </div>
-      </div>
 
-      <div className="control-buttons">
         <FullscreenButton targetId="fullscreen-display" />
-      </div>
-    </main>
+      </main>
+    </ThemeScope>
   );
 }

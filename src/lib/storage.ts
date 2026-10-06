@@ -37,7 +37,7 @@ export function validateUploadFile(file: {
 export function sanitizeFileName(fileName: string): string {
   const cleaned = fileName
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-zA-Z0-9._-]+/g, "_")
     .replace(/^[._]+/, "")
     .slice(-100);

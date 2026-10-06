@@ -1,0 +1,281 @@
+.list {
+  --marker: 32px;
+  --line: 2px;
+
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--lg-font-sans);
+  color: var(--lg-text);
+}
+
+.list[data-size="sm"] {
+  --marker: 24px;
+}
+
+.step {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+
+/* ============================== Horizontal ============================== */
+.list[data-orientation="horizontal"] .step {
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.list[data-orientation="horizontal"] .head {
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px;
+}
+
+.list[data-orientation="horizontal"] .connector {
+  position: absolute;
+  top: calc(var(--marker) / 2 - var(--line) / 2);
+  left: calc(50% + var(--marker) / 2 + 8px);
+  right: calc(-50% + var(--marker) / 2 + 8px);
+  height: var(--line);
+}
+
+/* ============================== Vertical ============================== */
+.list[data-orientation="vertical"] {
+  flex-direction: column;
+}
+
+.list[data-orientation="vertical"] .step {
+  flex-direction: column;
+  padding-bottom: 22px;
+}
+.list[data-orientation="vertical"] .step:last-child {
+  padding-bottom: 0;
+}
+
+.list[data-orientation="vertical"] .head {
+  align-items: flex-start;
+  gap: 14px;
+  text-align: left;
+}
+
+.list[data-orientation="vertical"] .text {
+  padding-top: calc((var(--marker) - 20px) / 2);
+}
+
+.list[data-orientation="vertical"] .connector {
+  position: absolute;
+  top: calc(var(--marker) + 6px);
+  bottom: 6px;
+  left: calc(var(--marker) / 2 - var(--line) / 2);
+  width: var(--line);
+}
+
+.body {
+  margin: 12px 0 0 calc(var(--marker) + 14px);
+  animation: fadeIn var(--lg-duration-slow) var(--lg-ease-out);
+}
+
+/* ============================== Cabeçalho ============================== */
+.head {
+  display: flex;
+  min-width: 0;
+  color: inherit;
+  font: inherit;
+  border-radius: var(--lg-radius-md);
+}
+
+button.head {
+  cursor: pointer;
+  transition: transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+button.head:hover .marker {
+  transform: scale(1.08);
+}
+button.head:active {
+  transform: scale(0.97);
+}
+button.head:focus-visible {
+  outline: none;
+}
+button.head:focus-visible .marker {
+  box-shadow:
+    0 0 0 1.5px var(--lg-focus-border),
+    0 0 0 4px var(--lg-focus-ring);
+}
+
+.marker {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--marker);
+  height: var(--marker);
+  border-radius: 50%;
+  font-size: var(--lg-text-sm);
+  font-weight: var(--lg-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--lg-text-tertiary);
+  background: var(--lg-fill);
+  box-shadow: inset 0 0 0 1px var(--lg-separator);
+  transition:
+    background var(--lg-duration-slow) var(--lg-ease-out),
+    color var(--lg-duration-base) ease,
+    box-shadow var(--lg-duration-base) ease,
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+
+.list[data-size="sm"] .marker {
+  font-size: var(--lg-text-xs);
+}
+
+.marker svg {
+  width: 52%;
+  height: 52%;
+}
+
+.marker[data-status="current"] {
+  color: var(--lg-accent);
+  background: var(--lg-glass-bg-strong);
+  box-shadow:
+    inset 0 0 0 1.5px var(--lg-accent),
+    0 0 0 4px var(--lg-accent-soft);
+  animation: pulse 2.4s var(--lg-ease-in-out) infinite;
+}
+
+.marker[data-status="complete"] {
+  color: #fff;
+  background: var(--lg-accent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 4px 10px -4px var(--lg-accent);
+}
+
+.marker[data-status="error"] {
+  color: #fff;
+  background: var(--lg-danger);
+  box-shadow: 0 4px 10px -4px var(--lg-danger);
+  animation: shake 0.42s var(--lg-ease-out);
+}
+
+.check path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: draw var(--lg-duration-slow) var(--lg-ease-out) forwards;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.title {
+  font-size: var(--lg-text-sm);
+  font-weight: var(--lg-weight-semibold);
+  line-height: 1.35;
+  color: var(--lg-text-secondary);
+  transition: color var(--lg-duration-base) ease;
+}
+
+.step[data-status="current"] .title,
+.step[data-status="complete"] .title {
+  color: var(--lg-text);
+}
+.step[data-status="error"] .title {
+  color: var(--lg-danger);
+}
+
+.optional {
+  font-weight: var(--lg-weight-regular);
+  color: var(--lg-text-tertiary);
+}
+
+.description {
+  font-size: var(--lg-text-xs);
+  line-height: 1.4;
+  color: var(--lg-text-tertiary);
+}
+
+/* ============================== Conector ============================== */
+.connector {
+  border-radius: var(--line);
+  background: var(--lg-separator);
+  overflow: hidden;
+}
+
+.connectorFill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--lg-accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--lg-duration-slow) var(--lg-ease-out);
+}
+
+.list[data-orientation="vertical"] .connectorFill {
+  transform: scaleY(0);
+  transform-origin: top;
+}
+
+.connectorFill[data-filled="true"] {
+  transform: none !important;
+}
+
+/* Horizontal no mobile: esconde descrições para caber */
+@media (max-width: 560px) {
+  .list[data-orientation="horizontal"] .description {
+    display: none;
+  }
+  .list[data-orientation="horizontal"] .title {
+    font-size: var(--lg-text-xs);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 1.5px var(--lg-accent),
+      0 0 0 4px var(--lg-accent-soft);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1.5px var(--lg-accent),
+      0 0 0 7px transparent;
+  }
+}
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+}

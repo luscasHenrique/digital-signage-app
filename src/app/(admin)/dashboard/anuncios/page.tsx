@@ -53,17 +53,9 @@ export default async function AnunciosPage() {
   }));
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold">Gerenciamento de Anúncios</h1>
-        <p className="text-muted-foreground">
-          Crie, edite e gerencie os anúncios da plataforma.
-        </p>
-      </div>
-      <AdvertisementsClient
-        initialAdvertisements={typedAdvertisements}
-        companies={companies as Company[]}
-      />
-    </div>
+    <AdvertisementsClient
+      initialAdvertisements={typedAdvertisements}
+      companies={companies as Company[]}
+    />
   );
 }

@@ -1,61 +1,68 @@
 // src/config/menuData.ts
-import { Home, Package, ShoppingCart, Settings } from "lucide-react";
+import { Home, Megaphone, Building2, Settings } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { UserRole } from "@/types";
-import { LucideIcon } from "lucide-react";
 
-// Tipo para os itens dentro de um submenu
-export type SubMenuItem = {
-  href: string;
-  label: string;
-};
-
-// Atualizamos o tipo principal para incluir um array opcional de sub-itens
 export type MenuItem = {
-  href: string;
+  id: string;
+  href?: string;
   label: string;
-  icon: LucideIcon;
+  icon?: LucideIcon;
+  /** Só aparece para este papel */
   role?: UserRole;
-  submenu?: SubMenuItem[]; // Propriedade para o submenu
+  children?: MenuItem[];
 };
 
 export const menuData: MenuItem[] = [
+  { id: "dashboard", href: "/dashboard", label: "Dashboard", icon: Home },
   {
-    href: "/dashboard",
-    label: "Dashboard",
-    icon: Home,
-  },
-  // EXEMPLO DE ITEM COM SUBMENU
-  {
-    href: "/dashboard/anuncios", // O href principal servirá como base
+    id: "anuncios",
+    href: "/dashboard/anuncios",
     label: "Anúncios",
-    icon: ShoppingCart,
-    submenu: [
-      {
-        href: "/dashboard/anuncios",
-        label: "Todos os Anúncios",
-      },
-    ],
+    icon: Megaphone,
   },
   {
+    id: "empresas",
     href: "/dashboard/empresas",
     label: "Empresas",
-    icon: Package,
+    icon: Building2,
   },
-  // EXEMPLO DE ITEM COM SUBMENU RESTRITO A ADMIN
   {
-    href: "/dashboard/admin",
+    id: "admin",
     label: "Administração",
     icon: Settings,
     role: UserRole.ADMIN,
-    submenu: [
+    children: [
+      { id: "usuarios", href: "/dashboard/admin/usuarios", label: "Usuários" },
       {
-        href: "/dashboard/admin/usuarios",
-        label: "Usuários",
-      },
-      {
+        id: "auditoria",
         href: "/dashboard/admin/auditoria",
         label: "Auditoria",
       },
     ],
   },
 ];
+
+/** Item de menu mais específico que corresponde à rota atual. */
+export function findActiveMenuId(
+  items: MenuItem[],
+  pathname: string
+): string | undefined {
+  let best: { id: string; length: number } | undefined;
+
+  const visit = (list: MenuItem[]) => {
+    for (const item of list) {
+      if (
+        item.href &&
+        (pathname === item.href || pathname.startsWith(`${item.href}/`)) &&
+        item.href.length > (best?.length ?? -1)
+      ) {
+        best = { id: item.id, length: item.href.length };
+      }
+      if (item.children) visit(item.children);
+    }
+  };
+  visit(items);
+
+  return best?.id;
+}

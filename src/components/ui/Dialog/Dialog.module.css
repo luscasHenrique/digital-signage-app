@@ -1,0 +1,215 @@
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: var(--lg-z-popover);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  font-family: var(--lg-font-sans);
+  color: var(--lg-text);
+}
+
+.root[data-placement="sheet"] {
+  place-items: end center;
+  padding: 0;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--lg-scrim);
+  -webkit-backdrop-filter: blur(6px) saturate(120%);
+  backdrop-filter: blur(6px) saturate(120%);
+  opacity: 0;
+  transition: opacity var(--lg-duration-base) ease;
+}
+
+.root[data-visible="true"] .overlay {
+  opacity: 1;
+}
+
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--dialog-w, 480px);
+  max-height: calc(100dvh - 48px);
+  border-radius: var(--lg-radius-xl);
+  background: var(--lg-glass-bg-strong);
+  -webkit-backdrop-filter: var(--lg-glass-filter-strong);
+  backdrop-filter: var(--lg-glass-filter-strong);
+  box-shadow:
+    var(--lg-glass-shadow),
+    0 40px 80px -24px rgba(0, 0, 0, 0.35);
+  outline: none;
+  opacity: 0;
+  transform: scale(0.92) translateY(8px);
+  transition:
+    opacity var(--lg-duration-base) ease,
+    transform var(--lg-duration-slow) var(--lg-ease-spring);
+}
+
+.root[data-visible="true"] .panel {
+  opacity: 1;
+  transform: none;
+}
+
+.panel[data-size="sm"] {
+  --dialog-w: 360px;
+}
+.panel[data-size="lg"] {
+  --dialog-w: 720px;
+}
+.panel[data-size="full"] {
+  --dialog-w: min(1100px, 100%);
+  height: calc(100dvh - 48px);
+}
+
+/* ---------- Sheet ---------- */
+.root[data-placement="sheet"] .panel {
+  max-width: min(var(--dialog-w, 560px), 100%);
+  max-height: 92dvh;
+  border-radius: var(--lg-radius-xl) var(--lg-radius-xl) 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  transform: translateY(100%);
+  transition:
+    opacity var(--lg-duration-fast) ease,
+    transform var(--lg-duration-slow) var(--lg-ease-out);
+}
+
+.root[data-placement="sheet"][data-visible="true"] .panel {
+  transform: none;
+}
+
+.grabber {
+  align-self: center;
+  width: 36px;
+  height: 5px;
+  margin-top: 8px;
+  border-radius: 3px;
+  background: var(--lg-fill-active);
+  flex-shrink: 0;
+}
+
+/* No mobile, o diálogo central vira sheet */
+@media (max-width: 560px) {
+  .root {
+    place-items: end center;
+    padding: 0;
+  }
+  .panel {
+    max-width: 100%;
+    max-height: 92dvh;
+    border-radius: var(--lg-radius-xl) var(--lg-radius-xl) 0 0;
+    transform: translateY(100%);
+    transition:
+      opacity var(--lg-duration-fast) ease,
+      transform var(--lg-duration-slow) var(--lg-ease-out);
+  }
+  .panel[data-size="full"] {
+    height: 92dvh;
+  }
+}
+
+/* ---------- Conteúdo ---------- */
+.close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--lg-text-secondary);
+  background: var(--lg-fill);
+  transition:
+    background var(--lg-duration-fast) ease,
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+.close:hover {
+  background: var(--lg-fill-hover);
+  color: var(--lg-text);
+}
+.close:active {
+  transform: scale(0.9);
+}
+.close:focus-visible {
+  outline: 2px solid var(--lg-accent);
+  outline-offset: 2px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 24px 56px 0 24px;
+}
+
+.headerCentered {
+  align-items: center;
+  text-align: center;
+  padding: 28px 24px 0;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 8px;
+  border-radius: 50%;
+  color: var(--lg-accent);
+  background: var(--lg-accent-soft);
+}
+.icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.title {
+  font-size: var(--lg-text-xl);
+  font-weight: var(--lg-weight-bold);
+  letter-spacing: var(--lg-tracking-tight);
+}
+
+.description {
+  font-size: var(--lg-text-md);
+  line-height: 1.5;
+  color: var(--lg-text-secondary);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px 24px;
+}
+
+.header + .footer {
+  margin-top: 20px;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 24px 24px;
+}
+
+.headerCentered ~ .footer > * {
+  flex: 1;
+}
+
+@media (max-width: 560px) {
+  .footer {
+    flex-direction: column-reverse;
+  }
+  .footer > * {
+    width: 100%;
+  }
+}

@@ -38,10 +38,5 @@ export default async function UsuariosPage() {
   await requireAdminPage();
   const users = await getUsersWithProfiles();
 
-  return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">Gerenciamento de Usuários</h1>
-      <UsersClient users={users} />
-    </div>
-  );
+  return <UsersClient users={users} />;
 }

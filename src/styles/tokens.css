@@ -1,0 +1,221 @@
+/* ==========================================================================
+   Liquid Glass — Design Tokens
+   Todos os tokens usam o prefixo --lg- para nunca colidir com o projeto host.
+   O tema é controlado por [data-theme="light" | "dark"] no <html>.
+   ========================================================================== */
+
+:root {
+  /* ---------- Tipografia ---------- */
+  --lg-font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", var(--font-inter, "Inter"), "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --lg-font-display: var(--font-display, "New York"), "Iowan Old Style", Georgia, serif;
+  --lg-font-mono: "SF Mono", ui-monospace, var(--font-mono, "JetBrains Mono"), Menlo, Consolas, monospace;
+
+  --lg-text-xs: 0.75rem; /* 12 */
+  --lg-text-sm: 0.8125rem; /* 13 */
+  --lg-text-md: 0.9375rem; /* 15 */
+  --lg-text-lg: 1.0625rem; /* 17 */
+  --lg-text-xl: 1.375rem; /* 22 */
+  --lg-text-2xl: 1.75rem; /* 28 */
+  --lg-text-3xl: 2.5rem; /* 40 */
+  --lg-text-display: clamp(2.75rem, 7vw, 5rem);
+
+  --lg-weight-regular: 400;
+  --lg-weight-medium: 500;
+  --lg-weight-semibold: 600;
+  --lg-weight-bold: 700;
+
+  --lg-leading-tight: 1.2;
+  --lg-leading-normal: 1.5;
+  --lg-tracking-tight: -0.022em;
+
+  /* ---------- Espaçamento (escala 4px) ---------- */
+  --lg-space-1: 4px;
+  --lg-space-2: 8px;
+  --lg-space-3: 12px;
+  --lg-space-4: 16px;
+  --lg-space-5: 20px;
+  --lg-space-6: 24px;
+  --lg-space-8: 32px;
+  --lg-space-10: 40px;
+  --lg-space-12: 48px;
+  --lg-space-16: 64px;
+
+  /* ---------- Raios (contínuos, estilo Apple) ---------- */
+  --lg-radius-xs: 6px;
+  --lg-radius-sm: 10px;
+  --lg-radius-md: 14px;
+  --lg-radius-lg: 20px;
+  --lg-radius-xl: 28px;
+  --lg-radius-full: 999px;
+
+  /* ---------- Alturas de controles ---------- */
+  --lg-control-sm: 32px;
+  --lg-control-md: 40px;
+  --lg-control-lg: 48px;
+
+  /* ---------- Movimento ---------- */
+  --lg-ease-out: cubic-bezier(0.32, 0.72, 0, 1); /* curva de "sheet" do iOS */
+  --lg-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* leve overshoot */
+  --lg-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --lg-duration-fast: 150ms;
+  --lg-duration-base: 250ms;
+  --lg-duration-slow: 420ms;
+
+  /* ---------- Camadas ---------- */
+  --lg-z-sticky: 100;
+  --lg-z-sidebar: 200;
+  --lg-z-popover: 1000;
+  --lg-z-tooltip: 1100;
+  --lg-z-toast: 1200;
+
+  /* ---------- Vidro (constantes) ---------- */
+  --lg-glass-blur: 24px;
+  --lg-glass-saturate: 180%;
+  --lg-glass-filter: blur(var(--lg-glass-blur)) saturate(var(--lg-glass-saturate));
+  --lg-glass-filter-strong: blur(40px) saturate(200%);
+}
+
+/* ==========================================================================
+   TEMA CLARO (padrão)
+   ========================================================================== */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  --lg-bg: #eef0f5;
+  --lg-bg-grid: rgba(15, 23, 42, 0.045);
+  --lg-blob-1: #ff8fab;
+  --lg-blob-2: #7aa7ff;
+  --lg-blob-3: #ffc078;
+  --lg-blob-4: #c4a1ff;
+  --lg-blob-opacity: 0.75;
+
+  --lg-text: #1d1d1f;
+  --lg-text-secondary: rgba(29, 29, 31, 0.7);
+  --lg-text-tertiary: rgba(29, 29, 31, 0.46);
+  --lg-text-on-accent: #ffffff;
+
+  /* Vidro */
+  --lg-glass-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.5) 100%);
+  --lg-glass-bg-strong: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(250, 250, 252, 0.82) 100%);
+  --lg-glass-border: rgba(255, 255, 255, 0.75);
+  --lg-glass-highlight: rgba(255, 255, 255, 1);
+  --lg-glass-hairline: rgba(15, 23, 42, 0.07);
+  --lg-glass-drop: 0 1px 2px rgba(15, 23, 42, 0.05), 0 12px 32px -8px rgba(15, 23, 42, 0.16);
+  /* --lg-glass-shadow é derivado: ver bloco "TOKENS DERIVADOS" no fim */
+
+  /* Preenchimentos (fills do iOS) */
+  --lg-fill: rgba(120, 120, 128, 0.12);
+  --lg-fill-hover: rgba(120, 120, 128, 0.18);
+  --lg-fill-active: rgba(120, 120, 128, 0.26);
+  --lg-separator: rgba(60, 60, 67, 0.13);
+  --lg-selected-bg: #ffffff;
+  --lg-selected-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 4px 14px -2px rgba(15, 23, 42, 0.14);
+
+  /* Campos */
+  --lg-field-bg: rgba(255, 255, 255, 0.55);
+  --lg-field-bg-hover: rgba(255, 255, 255, 0.75);
+  --lg-field-bg-focus: rgba(255, 255, 255, 0.95);
+  --lg-field-border: rgba(15, 23, 42, 0.1);
+  --lg-field-border-hover: rgba(15, 23, 42, 0.18);
+  --lg-field-placeholder: rgba(29, 29, 31, 0.38);
+
+  /* Semânticas */
+  --lg-accent: #007aff;
+  --lg-accent-hover: #0066d6;
+  --lg-accent-soft: rgba(0, 122, 255, 0.12);
+  /* Foco suave: borda translúcida + halo leve */
+  --lg-focus-border: rgba(0, 122, 255, 0.4);
+  --lg-focus-ring: rgba(0, 122, 255, 0.1);
+  --lg-danger: #ff3b30;
+  --lg-danger-hover: #e0281e;
+  --lg-danger-soft: rgba(255, 59, 48, 0.12);
+  --lg-danger-border: rgba(255, 59, 48, 0.5);
+  --lg-danger-ring: rgba(255, 59, 48, 0.12);
+  --lg-success: #28a745;
+  --lg-success-soft: rgba(52, 199, 89, 0.14);
+  --lg-warning: #c77700;
+  --lg-warning-soft: rgba(255, 149, 0, 0.15);
+  --lg-info: #007aff;
+  --lg-info-soft: rgba(0, 122, 255, 0.12);
+  /* Estrela de favorito (systemYellow do iOS) */
+  --lg-favorite: #ffcc00;
+
+  --lg-scrim: rgba(15, 23, 42, 0.18);
+  --lg-code-bg: rgba(15, 23, 42, 0.04);
+}
+
+/* ==========================================================================
+   TEMA ESCURO
+   ========================================================================== */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --lg-bg: #06070b;
+  --lg-bg-grid: rgba(255, 255, 255, 0.035);
+  --lg-blob-1: #3b3fb8;
+  --lg-blob-2: #0f6b5c;
+  --lg-blob-3: #7a2a4a;
+  --lg-blob-4: #4c2a8a;
+  --lg-blob-opacity: 0.7;
+
+  --lg-text: #f5f5f7;
+  --lg-text-secondary: rgba(235, 235, 245, 0.7);
+  --lg-text-tertiary: rgba(235, 235, 245, 0.42);
+  --lg-text-on-accent: #ffffff;
+
+  --lg-glass-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%);
+  --lg-glass-bg-strong: linear-gradient(180deg, rgba(44, 44, 50, 0.88) 0%, rgba(28, 28, 32, 0.86) 100%);
+  --lg-glass-border: rgba(255, 255, 255, 0.1);
+  --lg-glass-highlight: rgba(255, 255, 255, 0.2);
+  --lg-glass-hairline: rgba(0, 0, 0, 0.5);
+  --lg-glass-drop: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px -8px rgba(0, 0, 0, 0.7);
+
+  --lg-fill: rgba(118, 118, 128, 0.24);
+  --lg-fill-hover: rgba(118, 118, 128, 0.32);
+  --lg-fill-active: rgba(118, 118, 128, 0.4);
+  --lg-separator: rgba(84, 84, 88, 0.55);
+  --lg-selected-bg: rgba(255, 255, 255, 0.14);
+  --lg-selected-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 4px 14px -2px rgba(0, 0, 0, 0.5);
+
+  --lg-field-bg: rgba(255, 255, 255, 0.05);
+  --lg-field-bg-hover: rgba(255, 255, 255, 0.08);
+  --lg-field-bg-focus: rgba(255, 255, 255, 0.1);
+  --lg-field-border: rgba(255, 255, 255, 0.1);
+  --lg-field-border-hover: rgba(255, 255, 255, 0.18);
+  --lg-field-placeholder: rgba(235, 235, 245, 0.32);
+
+  --lg-accent: #0a84ff;
+  --lg-accent-hover: #3d9bff;
+  --lg-accent-soft: rgba(10, 132, 255, 0.2);
+  --lg-focus-border: rgba(10, 132, 255, 0.45);
+  --lg-focus-ring: rgba(10, 132, 255, 0.14);
+  --lg-danger: #ff453a;
+  --lg-danger-hover: #ff6961;
+  --lg-danger-soft: rgba(255, 69, 58, 0.18);
+  --lg-danger-border: rgba(255, 69, 58, 0.55);
+  --lg-danger-ring: rgba(255, 69, 58, 0.18);
+  --lg-success: #30d158;
+  --lg-success-soft: rgba(48, 209, 88, 0.18);
+  --lg-warning: #ffb340;
+  --lg-warning-soft: rgba(255, 159, 10, 0.18);
+  --lg-info: #64b5ff;
+  --lg-info-soft: rgba(10, 132, 255, 0.2);
+  --lg-favorite: #ffd60a;
+
+  --lg-scrim: rgba(0, 0, 0, 0.5);
+  --lg-code-bg: rgba(255, 255, 255, 0.04);
+}
+
+/* ==========================================================================
+   TOKENS DERIVADOS
+   Compostos a partir de outros tokens. Precisam ser declarados em TODO escopo
+   de tema (inclusive [data-theme] aninhado, ex.: <ThemeScope>); caso contrário
+   herdam o valor já resolvido no <html> e não trocam de tema.
+   ========================================================================== */
+:root,
+[data-theme] {
+  --lg-glass-shadow: inset 0 1px 0 0 var(--lg-glass-highlight), inset 0 0 0 1px var(--lg-glass-border),
+    0 0 0 1px var(--lg-glass-hairline), var(--lg-glass-drop);
+}

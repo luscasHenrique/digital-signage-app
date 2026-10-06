@@ -1,0 +1,382 @@
+/* ==========================================================================
+   Select / MultiSelect — gatilho na casca do Field + lista de vidro
+   (mesma estética do DropdownMenu)
+   ========================================================================== */
+
+.control {
+  cursor: pointer;
+}
+
+/* Aberto = mesmo visual do foco (o foco pode estar na busca, dentro do portal) */
+.control[data-open="true"] {
+  --field-ring: var(--lg-focus-border);
+  background: var(--lg-field-bg-focus);
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: inherit;
+  text-align: left;
+  cursor: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.placeholder {
+  color: var(--lg-field-placeholder);
+}
+
+.valueIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--lg-text-secondary);
+}
+.valueIcon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.chevron {
+  pointer-events: none;
+}
+.chevron > svg {
+  transition: transform var(--lg-duration-slow) var(--lg-ease-spring);
+}
+.chevron[data-open="true"] > svg {
+  transform: rotate(180deg);
+}
+.control:focus-within .chevron,
+.control[data-open="true"] .chevron {
+  color: var(--lg-accent);
+}
+
+/* ---------- Múltipla seleção: chips ---------- */
+.multiple .trigger {
+  flex-wrap: wrap;
+  gap: 6px;
+  height: auto;
+  min-height: var(--field-h);
+  padding-block: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 4px 0 10px;
+  border-radius: var(--lg-radius-full);
+  font-size: var(--lg-text-sm);
+  font-weight: var(--lg-weight-medium);
+  color: var(--lg-accent);
+  background: var(--lg-accent-soft);
+  animation: chipIn var(--lg-duration-base) var(--lg-ease-spring);
+}
+.control[data-size="sm"] .chip {
+  height: 22px;
+  font-size: var(--lg-text-xs);
+}
+
+.chipLabel {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chipMore {
+  padding-inline: 10px;
+  color: var(--lg-text-secondary);
+  background: var(--lg-fill);
+}
+
+.chipRemove {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: inherit;
+  transition:
+    background var(--lg-duration-fast) ease,
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+.chipRemove:hover {
+  background: color-mix(in srgb, var(--lg-accent) 20%, transparent);
+}
+.chipRemove:active {
+  transform: scale(0.85);
+}
+
+/* ---------- Nativo ---------- */
+.native {
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: inherit;
+  cursor: pointer;
+  /* deixa espaço para o chevron que fica por cima */
+  margin-right: -26px;
+  padding-right: 26px;
+}
+.native[data-empty="true"] {
+  color: var(--lg-field-placeholder);
+}
+.native option {
+  color: var(--lg-text);
+  background: var(--lg-bg);
+}
+.nativeChevron {
+  transition: transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+.control:focus-within .nativeChevron {
+  transform: translateY(1px);
+}
+
+/* ==========================================================================
+   Lista flutuante
+   ========================================================================== */
+
+.popup {
+  position: fixed;
+  z-index: var(--lg-z-popover);
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  max-width: calc(100vw - 16px);
+  border-radius: var(--lg-radius-lg);
+  font-family: var(--lg-font-sans);
+  color: var(--lg-text);
+  background: var(--lg-glass-bg-strong);
+  -webkit-backdrop-filter: var(--lg-glass-filter-strong);
+  backdrop-filter: var(--lg-glass-filter-strong);
+  box-shadow:
+    var(--lg-glass-shadow),
+    0 20px 40px -16px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  opacity: 0;
+  transform: scale(0.96) translateY(-4px);
+  transform-origin: top center;
+  transition:
+    opacity var(--lg-duration-fast) ease,
+    transform var(--lg-duration-slow) var(--lg-ease-spring);
+}
+.popup[data-side="top"] {
+  transform-origin: bottom center;
+  transform: scale(0.96) translateY(4px);
+}
+.popup[data-visible="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------- Busca ---------- */
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  margin: 6px 6px 0;
+  padding-inline: 10px;
+  border-radius: var(--lg-radius-sm);
+  color: var(--lg-text-tertiary);
+  background: var(--lg-fill);
+  transition:
+    color var(--lg-duration-fast) ease,
+    box-shadow var(--lg-duration-base) var(--lg-ease-out);
+}
+.search:focus-within {
+  color: var(--lg-accent);
+  box-shadow: inset 0 0 0 1px var(--lg-focus-border);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--lg-text);
+  font-family: inherit;
+  font-size: var(--lg-text-sm);
+}
+.searchInput::placeholder {
+  color: var(--lg-field-placeholder);
+  opacity: 1;
+}
+
+/* ---------- Opções ---------- */
+.list {
+  max-height: min(300px, 50vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--lg-fill-active) transparent;
+}
+
+.groupLabel {
+  padding: 8px 10px 4px;
+  font-size: 11px;
+  font-weight: var(--lg-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--lg-text-tertiary);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: var(--lg-radius-sm);
+  font-size: var(--lg-text-sm);
+  font-weight: var(--lg-weight-medium);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background var(--lg-duration-fast) ease,
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+.option[data-active="true"] {
+  background: var(--lg-fill);
+}
+.option:active:not([aria-disabled="true"]) {
+  background: var(--lg-fill-active);
+  transform: scale(0.98);
+}
+.option[aria-selected="true"] {
+  font-weight: var(--lg-weight-semibold);
+}
+.option[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.optionIcon {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 20px;
+  color: var(--lg-text-secondary);
+}
+.optionIcon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.optionText {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.optionDescription {
+  font-size: var(--lg-text-xs);
+  font-weight: var(--lg-weight-regular);
+  color: var(--lg-text-tertiary);
+}
+
+.optionCheck {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--lg-accent);
+  opacity: 0;
+  transform: scale(0.5);
+  transition:
+    opacity var(--lg-duration-fast) ease,
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+.optionCheck[data-checked="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Caixa de seleção (MultiSelect) — mesma linguagem do Checkbox */
+.box {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  color: var(--lg-text-on-accent);
+  background: var(--lg-field-bg);
+  box-shadow: inset 0 0 0 1.5px var(--lg-field-border-hover);
+  transition:
+    background var(--lg-duration-fast) ease,
+    box-shadow var(--lg-duration-fast) ease,
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+.box > svg {
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity var(--lg-duration-fast) ease,
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+.box[data-state="checked"],
+.box[data-state="mixed"] {
+  background: var(--lg-accent);
+  box-shadow: none;
+}
+.box[data-state="checked"] > svg {
+  opacity: 1;
+  transform: none;
+}
+.option:active .box {
+  transform: scale(0.88);
+}
+
+.dash {
+  width: 9px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  animation: chipIn var(--lg-duration-base) var(--lg-ease-spring);
+}
+
+.selectAll {
+  color: var(--lg-text-secondary);
+}
+
+.separator {
+  height: 1px;
+  margin: 4px;
+  background: var(--lg-separator);
+}
+
+.mark {
+  background: none;
+  color: var(--lg-accent);
+  font-weight: var(--lg-weight-semibold);
+}
+
+.empty {
+  padding: 18px 10px;
+  text-align: center;
+  font-size: var(--lg-text-sm);
+  color: var(--lg-text-tertiary);
+}
+
+@keyframes chipIn {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}

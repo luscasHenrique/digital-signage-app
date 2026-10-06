@@ -1,40 +1,14 @@
 // src/components/admin/advertisements/AdvertisementsCard.tsx
 "use client";
 
-import Image from "next/image";
-import { isOptimizableImage } from "@/lib/storage";
-import { Badge, badgeVariants } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Building,
-  Calendar,
-  MoreVertical,
-  Eye,
-  Edit,
-  Trash2,
-  Video,
-} from "lucide-react";
-import type { VariantProps } from "class-variance-authority";
-
-// Tipos oficiais
-import {
-  Advertisement,
-  AdvertisementStatus,
-  AdvertisementType,
-  Company,
-} from "@/types";
-
-// O client garante companies
-type AdvertisementWithCompanies = Advertisement & { companies: Company[] };
+import { Building2, CalendarDays, Pencil, Timer, Trash2 } from "lucide-react";
+import { RowActions } from "@/components/admin/RowActions";
+import { Badge } from "@/components/ui/Badge/Badge";
+import { Card } from "@/components/ui/Card/Card";
+import { formatPeriod } from "@/lib/format";
+import { AdvertisementPreview } from "./AdvertisementPreview";
+import type { AdvertisementWithCompanies } from "./AdvertisementsClient";
+import { ScheduleBadge } from "./ScheduleBadge";
 
 interface AdvertisementsCardProps {
   anuncio: AdvertisementWithCompanies;
@@ -42,177 +16,81 @@ interface AdvertisementsCardProps {
   onDelete: (anuncio: AdvertisementWithCompanies) => void;
 }
 
-type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
-
-const statusMap: Record<
-  AdvertisementStatus,
-  { text: string; variant: BadgeVariant }
-> = {
-  [AdvertisementStatus.ACTIVE]: { text: "Ativo", variant: "success" },
-  [AdvertisementStatus.INACTIVE]: { text: "Inativo", variant: "destructive" },
-};
-
-/**
- * Extrai a thumbnail de um link do YouTube (se aplicável).
- */
-function getYoutubeThumbnailUrl(url: string): string | null {
-  try {
-    const urlObj = new URL(url);
-    let videoId: string | null = null;
-
-    if (urlObj.hostname === "youtu.be") {
-      videoId = urlObj.pathname.slice(1);
-    } else if (
-      urlObj.hostname === "www.youtube.com" ||
-      urlObj.hostname === "youtube.com"
-    ) {
-      videoId = urlObj.searchParams.get("v");
-    }
-
-    return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null;
-  } catch (error) {
-    console.error("URL de vídeo inválida:", error);
-    return null;
-  }
-}
-
 export function AdvertisementsCard({
   anuncio,
   onEdit,
   onDelete,
 }: AdvertisementsCardProps) {
-  const statusInfo = statusMap[anuncio.status];
-
-  const renderPreview = () => {
-    const isImageType =
-      anuncio.type === AdvertisementType.IMAGE_LINK ||
-      anuncio.type === AdvertisementType.IMAGE_UPLOAD;
-
-    // 1) Imagem: usa a própria imagem do anúncio
-    if (isImageType) {
-      return (
-        <Image
-          src={anuncio.content_url}
-          unoptimized={!isOptimizableImage(anuncio.content_url)}
-          alt={`Preview do anúncio: ${anuncio.title}`}
-          fill
-          className="object-cover"
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-        />
-      );
-    }
-
-    // 2) Não é imagem: se houver thumbnail_url, prioriza ela
-    const hasThumb =
-      typeof anuncio.thumbnail_url === "string" &&
-      anuncio.thumbnail_url.trim().length > 0;
-
-    if (hasThumb) {
-      return (
-        <Image
-          src={anuncio.thumbnail_url as string}
-          unoptimized={!isOptimizableImage(anuncio.thumbnail_url as string)}
-          alt={`Thumbnail do anúncio: ${anuncio.title}`}
-          fill
-          className="object-cover"
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-        />
-      );
-    }
-
-    // 3) Sem thumbnail_url: se for link/embed de YouTube, tenta extrair capa
-    const youtubeThumbnail = getYoutubeThumbnailUrl(anuncio.content_url);
-    if (youtubeThumbnail) {
-      return (
-        <Image
-          src={youtubeThumbnail}
-          unoptimized={!isOptimizableImage(youtubeThumbnail)}
-          alt={`Thumbnail do vídeo: ${anuncio.title}`}
-          fill
-          className="object-cover"
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-        />
-      );
-    }
-
-    // 4) Fallback padrão: ícone de vídeo/câmera
-    return (
-      <div className="w-full h-full bg-secondary flex items-center justify-center">
-        <Video className="h-12 w-12 text-muted-foreground" />
-      </div>
-    );
-  };
-
   return (
-    <Card className="flex flex-col overflow-hidden transition-all hover:shadow-lg">
-      <CardHeader className="p-0">
-        <div className="aspect-video relative group bg-muted">
-          {renderPreview()}
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <Button size="icon" variant="secondary">
-              <Eye className="h-5 w-5" />
-              <span className="sr-only">Ver preview</span>
-            </Button>
-          </div>
+    <Card
+      padding="none"
+      radius="lg"
+      interactive
+      className="flex cursor-pointer flex-col overflow-hidden"
+      onClick={(e) => {
+        // Cliques no menu (renderizado em Portal) também sobem até aqui
+        if (e.currentTarget.contains(e.target as Node)) onEdit(anuncio);
+      }}
+    >
+      <div className="relative aspect-video bg-muted">
+        <AdvertisementPreview
+          ad={anuncio}
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+        />
+        <div className="absolute left-2 top-2">
+          <ScheduleBadge ad={anuncio} overImage />
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="p-4 flex flex-col flex-grow">
-        <div className="flex justify-between items-start mb-3">
-          <div className="flex-1 pr-2">
-            <CardTitle className="text-lg leading-tight mb-1">
-              {anuncio.title}
-            </CardTitle>
-            <Badge variant={statusInfo.variant} className="capitalize">
-              {statusInfo.text}
-            </Badge>
-          </div>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="flex-shrink-0">
-                <MoreVertical className="h-5 w-5" />
-                <span className="sr-only">Abrir menu de ações</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Ações</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onEdit(anuncio)}>
-                <Edit className="mr-2 h-4 w-4" />
-                <span>Editar</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-red-600 focus:text-red-600"
-                onClick={() => onDelete(anuncio)}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                <span>Excluir</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="line-clamp-2 text-[length:var(--lg-text-md)] leading-snug">
+            {anuncio.title}
+          </h3>
+          <RowActions
+            items={[
+              {
+                label: "Editar",
+                icon: <Pencil />,
+                onSelect: () => onEdit(anuncio),
+              },
+              { type: "separator" },
+              {
+                label: "Excluir",
+                icon: <Trash2 />,
+                tone: "danger",
+                onSelect: () => onDelete(anuncio),
+              },
+            ]}
+          />
         </div>
 
-        <div className="mt-auto space-y-3 text-sm text-muted-foreground pt-4">
+        <dl className="mt-auto flex flex-col gap-2 text-sm text-muted-foreground">
           <div className="flex items-start gap-2">
-            <Building className="h-4 w-4 mt-0.5 flex-shrink-0" />
-            <div className="flex flex-wrap gap-1">
-              {anuncio.companies?.map((empresa) => (
-                <Badge key={empresa.id} variant="outline">
-                  {empresa.name}
-                </Badge>
-              ))}
-            </div>
+            <dt className="sr-only">Empresas</dt>
+            <Building2 className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <dd className="flex flex-wrap gap-1">
+              {anuncio.companies.length ? (
+                anuncio.companies.map((empresa) => (
+                  <Badge key={empresa.id}>{empresa.name}</Badge>
+                ))
+              ) : (
+                <span>Nenhuma empresa</span>
+              )}
+            </dd>
           </div>
           <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 flex-shrink-0" />
-            <span>
-              Válido até{" "}
-              {new Date(anuncio.end_date).toLocaleDateString("pt-BR")}
-            </span>
+            <dt className="sr-only">Período</dt>
+            <CalendarDays className="size-4 shrink-0" aria-hidden />
+            <dd>{formatPeriod(anuncio.start_date, anuncio.end_date)}</dd>
           </div>
-        </div>
-      </CardContent>
+          <div className="flex items-center gap-2">
+            <dt className="sr-only">Duração</dt>
+            <Timer className="size-4 shrink-0" aria-hidden />
+            <dd>{anuncio.duration_seconds}s por exibição</dd>
+          </div>
+        </dl>
+      </div>
     </Card>
   );
 }

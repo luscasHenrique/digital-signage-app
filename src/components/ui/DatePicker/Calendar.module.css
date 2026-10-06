@@ -1,0 +1,224 @@
+.calendar {
+  --cell: 38px;
+  width: calc(var(--cell) * 7);
+  font-family: var(--lg-font-sans);
+  color: var(--lg-text);
+  user-select: none;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 8px;
+  margin-left: -8px;
+  border-radius: var(--lg-radius-sm);
+  font-size: var(--lg-text-md);
+  font-weight: var(--lg-weight-semibold);
+  transition: background var(--lg-duration-fast) ease;
+}
+.title:hover {
+  background: var(--lg-fill);
+}
+.titleChevron {
+  color: var(--lg-accent);
+  transition: transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+.titleChevron[data-open="true"] {
+  transform: rotate(90deg);
+}
+
+.nav {
+  display: flex;
+  gap: 2px;
+}
+
+.navButton {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--lg-accent);
+  transition:
+    background var(--lg-duration-fast) ease,
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+.navButton:hover {
+  background: var(--lg-fill);
+}
+.navButton:active {
+  transform: scale(0.88);
+}
+
+.title:focus-visible,
+.navButton:focus-visible,
+.monthCell:focus-visible {
+  outline: 2px solid var(--lg-accent);
+  outline-offset: 1px;
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, var(--cell));
+  font-size: 11px;
+  font-weight: var(--lg-weight-semibold);
+  text-transform: uppercase;
+  color: var(--lg-text-tertiary);
+  text-align: center;
+  margin-bottom: 2px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, var(--cell));
+  grid-auto-rows: var(--cell);
+  row-gap: 2px;
+  animation: fromRight var(--lg-duration-slow) var(--lg-ease-out);
+}
+.grid[data-direction="prev"] {
+  animation-name: fromLeft;
+}
+
+.day {
+  position: relative;
+  display: grid;
+  place-items: center;
+  font-size: var(--lg-text-md);
+  font-variant-numeric: tabular-nums;
+  color: var(--lg-text);
+  outline: none;
+  isolation: isolate;
+}
+
+.day > span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  transition:
+    background var(--lg-duration-fast) ease,
+    color var(--lg-duration-fast) ease,
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+
+.day:hover:not([aria-disabled="true"]) > span {
+  background: var(--lg-fill);
+}
+.day:active:not([aria-disabled="true"]) > span {
+  transform: scale(0.88);
+}
+.day:focus-visible > span {
+  box-shadow: 0 0 0 2px var(--lg-accent);
+}
+
+.day[data-outside="true"] {
+  color: var(--lg-text-tertiary);
+}
+
+.day[data-today="true"] {
+  color: var(--lg-accent);
+  font-weight: var(--lg-weight-bold);
+}
+
+.day[aria-disabled="true"] {
+  color: var(--lg-text-tertiary);
+  opacity: 0.45;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.day[data-selected="true"] > span,
+.day[data-selected="true"]:hover > span {
+  color: #fff;
+  font-weight: var(--lg-weight-semibold);
+  background: var(--lg-accent);
+  box-shadow: 0 4px 12px -4px var(--lg-accent);
+  animation: pop var(--lg-duration-base) var(--lg-ease-spring);
+}
+
+/* Faixa do intervalo */
+.day[data-in-range="true"]::before,
+.day[data-range-start="true"]::before,
+.day[data-range-end="true"]::before {
+  content: "";
+  position: absolute;
+  inset: 2px 0;
+  z-index: -1;
+  background: var(--lg-accent-soft);
+}
+.day[data-range-start="true"]::before {
+  left: 50%;
+}
+.day[data-range-end="true"]::before {
+  right: 50%;
+}
+.day[data-in-range="true"] {
+  color: var(--lg-accent);
+}
+
+/* ---------- Meses ---------- */
+.months {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  animation: fade var(--lg-duration-base) ease;
+}
+
+.monthCell {
+  height: 44px;
+  border-radius: var(--lg-radius-md);
+  font-size: var(--lg-text-sm);
+  font-weight: var(--lg-weight-medium);
+  text-transform: capitalize;
+  transition: background var(--lg-duration-fast) ease;
+}
+.monthCell:hover {
+  background: var(--lg-fill);
+}
+.monthCell[data-selected="true"] {
+  color: #fff;
+  background: var(--lg-accent);
+}
+
+@media (max-width: 380px) {
+  .calendar {
+    --cell: 34px;
+  }
+  .day > span {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+@keyframes fromRight {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+}
+@keyframes fromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes pop {
+  from {
+    transform: scale(0.7);
+  }
+}

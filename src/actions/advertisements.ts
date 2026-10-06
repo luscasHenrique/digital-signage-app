@@ -3,6 +3,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAuthContext } from "@/lib/auth";
+import { isHttpUrl } from "@/lib/schemas";
 import {
   ADVERTISEMENTS_BUCKET,
   extractStoragePathFromPublicUrl,
@@ -114,9 +115,7 @@ const actionSchema = z
       const isAllowedType = Object.values(AdvertisementType).includes(
         data.type
       );
-      const hasValidUrl =
-        !!data.content_url &&
-        z.string().url().safeParse(data.content_url).success;
+      const hasValidUrl = !!data.content_url && isHttpUrl(data.content_url);
       return isAllowedType && hasValidUrl;
     },
     {
@@ -129,7 +128,7 @@ const actionSchema = z
   // Thumbnail OPCIONAL: valide apenas se enviada
   .superRefine((data, ctx) => {
     if (data.thumbnail_url) {
-      const ok = z.string().url().safeParse(data.thumbnail_url).success;
+      const ok = isHttpUrl(data.thumbnail_url);
       if (!ok) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -150,7 +149,8 @@ export async function createAdvertisement(data: ActionInput) {
   }
 
   const ctx = await getAuthContext();
-  if (!ctx) return { success: false, message: { _server: ["Não autenticado"] } };
+  if (!ctx)
+    return { success: false, message: { _server: ["Não autenticado"] } };
   const { supabase, user } = ctx;
 
   const { company_ids, ...adData } = validation.data;
@@ -196,7 +196,8 @@ export async function updateAdvertisement(data: ActionInput) {
   }
 
   const ctx = await getAuthContext();
-  if (!ctx) return { success: false, message: { _server: ["Não autenticado"] } };
+  if (!ctx)
+    return { success: false, message: { _server: ["Não autenticado"] } };
   const { supabase, user } = ctx;
 
   const { id, company_ids, ...adData } = validation.data;
@@ -315,6 +316,53 @@ export async function getSignedUploadUrl({
   } catch (error) {
     console.error("Erro ao gerar URL de upload:", errorMessage(error));
     return { success: false, message: "Falha ao gerar URL de upload." };
+  }
+}
+
+/**
+ * Remove arquivos enviados num formulário que foi cancelado antes de salvar.
+ * Só apaga arquivos da pasta do próprio usuário e que nenhum anúncio esteja usando.
+ */
+export async function discardUploads(urls: string[]) {
+  const ctx = await getAuthContext();
+  if (!ctx) return { success: false, message: "Não autenticado." };
+
+  const candidates = Array.from(new Set(urls)).slice(0, 10);
+  const paths = candidates
+    .map((url) => ({ url, path: extractStoragePathFromPublicUrl(url) }))
+    .filter(
+      (item): item is { url: string; path: string } =>
+        !!item.path && item.path.startsWith(`${ctx.user.id}/`)
+    );
+  if (paths.length === 0) return { success: true, message: "Nada a remover." };
+
+  try {
+    const urlList = paths.map((p) => p.url);
+    const [asContent, asThumbnail] = await Promise.all([
+      ctx.supabase
+        .from("advertisements")
+        .select("content_url")
+        .in("content_url", urlList),
+      ctx.supabase
+        .from("advertisements")
+        .select("thumbnail_url")
+        .in("thumbnail_url", urlList),
+    ]);
+    if (asContent.error) throw asContent.error;
+    if (asThumbnail.error) throw asThumbnail.error;
+
+    const used = new Set<string>([
+      ...(asContent.data ?? []).map((ad) => ad.content_url as string),
+      ...(asThumbnail.data ?? []).map((ad) => ad.thumbnail_url as string),
+    ]);
+    await removeStorageFiles(
+      ctx.supabase,
+      paths.filter((p) => !used.has(p.url)).map((p) => p.url)
+    );
+    return { success: true, message: "Arquivos removidos." };
+  } catch (error) {
+    console.warn("Falha ao descartar uploads:", error);
+    return { success: false, message: "Falha ao descartar arquivos." };
   }
 }
 

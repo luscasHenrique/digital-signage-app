@@ -1,0 +1,16 @@
+.control {
+  align-items: stretch;
+  padding-block: 10px;
+}
+
+.textarea {
+  height: auto;
+  min-height: 3lh;
+  resize: none;
+  line-height: var(--lg-leading-normal);
+}
+
+.nearLimit {
+  color: var(--lg-warning);
+  font-weight: var(--lg-weight-semibold);
+}

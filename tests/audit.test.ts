@@ -6,9 +6,7 @@ describe("sanitizeAuditSearchTerm (S9)", () => {
     expect(sanitizeAuditSearchTerm("x%,user_id.not.is.null")).toBe(
       "x user_id.not.is.null"
     );
-    expect(sanitizeAuditSearchTerm(`a"b(c)d\\e*f:g'h`)).toBe(
-      "a b c d e f g h"
-    );
+    expect(sanitizeAuditSearchTerm(`a"b(c)d\\e*f:g'h`)).toBe("a b c d e f g h");
   });
 
   it("mantém termos comuns e trata vazio", () => {

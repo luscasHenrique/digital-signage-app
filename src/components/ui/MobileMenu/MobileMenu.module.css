@@ -1,0 +1,450 @@
+/* ==========================================================================
+   MobileMenu — hambúrguer + painel de vidro (tela cheia ou gaveta)
+   ========================================================================== */
+
+/* ---------- Botão hambúrguer ---------- */
+.toggle {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--lg-radius-full);
+  color: var(--lg-text);
+  background: var(--lg-glass-bg);
+  -webkit-backdrop-filter: var(--lg-glass-filter);
+  backdrop-filter: var(--lg-glass-filter);
+  box-shadow: var(--lg-glass-shadow);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+.toggle:active {
+  transform: scale(0.9);
+}
+.toggle:focus-visible {
+  outline: 2px solid var(--lg-accent);
+  outline-offset: 2px;
+}
+
+.bars {
+  position: relative;
+  width: 18px;
+  height: 12px;
+}
+.bars > span {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  transition:
+    top var(--lg-duration-base) var(--lg-ease-out),
+    transform var(--lg-duration-slow) var(--lg-ease-spring);
+}
+.bars > span:first-child {
+  top: 1px;
+}
+.bars > span:last-child {
+  top: 9px;
+}
+.toggle[data-open="true"] .bars > span {
+  top: 5px;
+}
+.toggle[data-open="true"] .bars > span:first-child {
+  transform: rotate(45deg);
+}
+.toggle[data-open="true"] .bars > span:last-child {
+  transform: rotate(-45deg);
+}
+
+/* ---------- Camadas ---------- */
+.root {
+  --mm-pad: 16px;
+
+  position: fixed;
+  inset: 0;
+  z-index: var(--lg-z-popover);
+  font-family: var(--lg-font-sans);
+  color: var(--lg-text);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--lg-scrim);
+  -webkit-backdrop-filter: blur(6px) saturate(120%);
+  backdrop-filter: blur(6px) saturate(120%);
+  opacity: 0;
+  transition: opacity var(--lg-duration-base) ease;
+}
+.root[data-visible="true"] .overlay {
+  opacity: 1;
+}
+
+.panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: calc(12px + env(safe-area-inset-top)) var(--mm-pad) calc(16px + env(safe-area-inset-bottom));
+  background: var(--lg-glass-bg-strong);
+  -webkit-backdrop-filter: var(--lg-glass-filter-strong);
+  backdrop-filter: var(--lg-glass-filter-strong);
+  box-shadow: var(--lg-glass-shadow);
+  outline: none;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-12px) scale(0.98);
+  transform-origin: top center;
+  transition:
+    opacity var(--lg-duration-base) ease,
+    transform var(--lg-duration-slow) var(--lg-ease-out);
+}
+.root[data-visible="true"] .panel {
+  opacity: 1;
+  transform: none;
+}
+
+/* Tela cheia: em telas largas o conteúdo fica numa coluna central */
+.root[data-placement="full"] {
+  --mm-pad: max(16px, calc((100vw - 640px) / 2));
+}
+
+/* Gaveta */
+.root[data-placement="left"] .panel,
+.root[data-placement="right"] .panel {
+  --mm-pad: 16px;
+  inset: 8px auto 8px 8px;
+  width: min(360px, calc(100% - 56px));
+  border-radius: var(--lg-radius-xl);
+  opacity: 1;
+  transform: translateX(calc(-100% - 16px));
+  box-shadow:
+    var(--lg-glass-shadow),
+    0 40px 80px -24px rgba(0, 0, 0, 0.35);
+}
+.root[data-placement="right"] .panel {
+  inset: 8px 8px 8px auto;
+  transform: translateX(calc(100% + 16px));
+}
+.root[data-placement="left"][data-visible="true"] .panel,
+.root[data-placement="right"][data-visible="true"] .panel {
+  transform: none;
+}
+
+/* ---------- Header ---------- */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  padding-inline: 4px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.brandLogo {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.brandTitle {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--lg-text-lg);
+  font-weight: var(--lg-weight-bold);
+  letter-spacing: var(--lg-tracking-tight);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* ---------- Usuário ---------- */
+.user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px;
+  border-radius: var(--lg-radius-lg);
+  font-family: inherit;
+  text-align: left;
+  color: inherit;
+  background: var(--lg-fill);
+  box-shadow: inset 0 1px 0 var(--lg-glass-highlight);
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background var(--lg-duration-fast) ease,
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+.user:not(:disabled):active {
+  transform: scale(0.98);
+}
+.user:disabled {
+  cursor: default;
+}
+.user:focus-visible {
+  outline: 2px solid var(--lg-accent);
+  outline-offset: 2px;
+}
+
+.userText {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.userName {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--lg-text-md);
+  font-weight: var(--lg-weight-semibold);
+}
+
+.userSubtitle {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--lg-text-xs);
+  color: var(--lg-text-tertiary);
+}
+
+.userChevron {
+  display: inline-flex;
+  color: var(--lg-text-tertiary);
+}
+
+/* ---------- Navegação ---------- */
+.nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 8px calc(var(--mm-pad) * -1) 0;
+  padding: 4px var(--mm-pad) 12px;
+  mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 16px), transparent);
+}
+
+.section {
+  padding-block: 6px;
+}
+
+.sectionTitle {
+  padding: 8px 12px 6px;
+  font-size: 11px;
+  font-weight: var(--lg-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lg-text-tertiary);
+}
+
+.list,
+.subList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.li {
+  display: flex;
+  flex-direction: column;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 50px;
+  padding: 0 12px;
+  border-radius: var(--lg-radius-md);
+  font-family: inherit;
+  font-size: var(--lg-text-lg);
+  font-weight: var(--lg-weight-medium);
+  text-align: left;
+  text-decoration: none;
+  color: var(--lg-text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background var(--lg-duration-fast) ease,
+    box-shadow var(--lg-duration-base) var(--lg-ease-out),
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+/* Hover só com mouse: no toque ele "gruda" depois do tap */
+@media (hover: hover) {
+  .item:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--lg-fill);
+  }
+  .user:not(:disabled):hover {
+    background: var(--lg-fill-hover);
+  }
+}
+.item:active:not(:disabled) {
+  background: var(--lg-fill-active);
+  transform: scale(0.98);
+}
+.item:focus-visible {
+  outline: 2px solid var(--lg-accent);
+  outline-offset: -2px;
+}
+.item:disabled,
+.item[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.item[data-active="true"] {
+  font-weight: var(--lg-weight-semibold);
+  background: var(--lg-selected-bg);
+  box-shadow: var(--lg-selected-shadow);
+}
+.item[data-active="true"]:hover {
+  background: var(--lg-selected-bg);
+}
+
+.itemIcon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  color: var(--lg-text-secondary);
+  transition: color var(--lg-duration-fast) ease;
+}
+.itemIcon > svg {
+  width: 20px;
+  height: 20px;
+}
+.item[data-active="true"] .itemIcon,
+.item[data-child-active="true"] .itemIcon {
+  color: var(--lg-accent);
+}
+
+.itemLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.itemBadge {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--lg-text-tertiary);
+}
+.chevron > svg {
+  transition: transform var(--lg-duration-slow) var(--lg-ease-spring);
+}
+.chevron[data-open="true"] > svg {
+  transform: rotate(180deg);
+}
+
+/* ---------- Sub-itens (acordeão) ---------- */
+.sub {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--lg-duration-slow) var(--lg-ease-out);
+}
+.sub[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+
+.subList {
+  position: relative;
+  overflow: hidden;
+  padding-left: 36px;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity var(--lg-duration-base) ease,
+    transform var(--lg-duration-slow) var(--lg-ease-out);
+}
+.sub[data-open="true"] .subList {
+  padding-block: 2px;
+  opacity: 1;
+  transform: none;
+}
+
+/* Linha guia vertical */
+.subList::before {
+  content: "";
+  position: absolute;
+  left: 23px;
+  top: 6px;
+  bottom: 6px;
+  width: 1.5px;
+  border-radius: 2px;
+  background: var(--lg-separator);
+}
+
+.subItem {
+  min-height: 42px;
+  font-size: var(--lg-text-md);
+  color: var(--lg-text-secondary);
+}
+.subItem .itemIcon > svg {
+  width: 17px;
+  height: 17px;
+}
+.subItem[data-active="true"] {
+  color: var(--lg-accent);
+  background: var(--lg-accent-soft);
+  box-shadow: none;
+}
+.subItem[data-active="true"]:hover {
+  background: var(--lg-accent-soft);
+}
+
+/* ---------- Rodapé ---------- */
+.navFooter {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--lg-separator);
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+}
+
+/* ---------- Entrada escalonada ---------- */
+.stagger {
+  opacity: 0;
+  transform: translateY(-8px);
+  transition:
+    opacity var(--lg-duration-base) var(--lg-ease-out),
+    transform var(--lg-duration-slow) var(--lg-ease-out);
+}
+.root[data-visible="true"] .stagger {
+  opacity: 1;
+  transform: none;
+  transition-delay: calc(min(var(--i, 0), 10) * 28ms + 60ms);
+}

@@ -6,23 +6,29 @@ import {
   OverlayPosition,
   UserRole,
 } from "@/types";
-import { validateUploadFile } from "@/lib/storage";
+
+/** Só aceita URLs http(s): bloqueia javascript:, data: etc. (viram XSS em href/src). */
+export function isHttpUrl(value: string | null | undefined): boolean {
+  if (!value) return false;
+  try {
+    const { protocol } = new URL(value);
+    return protocol === "https:" || protocol === "http:";
+  } catch {
+    return false;
+  }
+}
 
 export const advertisementFormSchema = z
   .object({
     id: z.string().optional(),
-    title: z.string().min(3, "O título é obrigatório."),
+    title: z.string().trim().min(3, "O título é obrigatório."),
     description: z.string().optional(),
 
-    // Mantemos opcional no form (validado adiante)
+    // Opcional no form para começar sem tipo escolhido (validado adiante)
     type: z.nativeEnum(AdvertisementType).optional(),
 
-    // Conteúdo principal
-    content_file: z.any().optional(),
+    // URL do conteúdo: preenchida pelo upload (arquivo) ou digitada (link)
     content_url: z.string().optional(),
-
-    // Thumbnail (OPCIONAL)
-    thumbnail_file: z.any().optional(),
     thumbnail_url: z.string().optional(),
 
     start_date: z.date().nullable(),
@@ -44,126 +50,31 @@ export const advertisementFormSchema = z
     overlay_bg_color: z.string().optional(),
     overlay_text_color: z.string().optional(),
   })
-  // Obrigatórios básicos
-  .refine((data) => data.type !== undefined && data.type !== null, {
-    message: "O tipo de anúncio é obrigatório.",
-    path: ["type"],
-  })
-  .refine((data) => data.start_date !== null, {
-    message: "A data inicial é obrigatória.",
-    path: ["start_date"],
-  })
-  .refine((data) => data.end_date !== null, {
-    message: "A data final é obrigatória.",
-    path: ["end_date"],
-  })
-  // Data final >= inicial
-  .refine(
-    (data) => {
-      if (data.start_date && data.end_date) {
-        return data.end_date >= data.start_date;
-      }
-      return true;
-    },
-    {
-      message: "A data final deve ser igual ou posterior à data inicial.",
-      path: ["end_date"],
-    }
-  )
-  // Conteúdo coerente com o tipo (upload vs link)
-  .refine(
-    (data) => {
-      if (!data.type) return true;
+  .superRefine((data, ctx) => {
+    const issue = (path: string, message: string) =>
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
 
+    if (!data.type) issue("type", "O tipo de anúncio é obrigatório.");
+    if (!data.start_date) issue("start_date", "A data inicial é obrigatória.");
+    if (!data.end_date) issue("end_date", "A data final é obrigatória.");
+    if (data.start_date && data.end_date && data.end_date < data.start_date) {
+      issue("end_date", "A data final deve ser igual ou posterior à inicial.");
+    }
+
+    if (data.type && !isHttpUrl(data.content_url)) {
       const isUpload =
         data.type === AdvertisementType.IMAGE_UPLOAD ||
         data.type === AdvertisementType.VIDEO_UPLOAD;
-
-      const isLink =
-        data.type === AdvertisementType.IMAGE_LINK ||
-        data.type === AdvertisementType.VIDEO_LINK ||
-        data.type === AdvertisementType.EMBED_LINK;
-
-      if (isLink) {
-        return (
-          !!data.content_url &&
-          z.string().url().safeParse(data.content_url).success
-        );
-      }
-
-      if (isUpload) {
-        // A validação de arquivo obrigatório é feita aqui
-        return (
-          (typeof FileList !== "undefined" &&
-            data.content_file instanceof FileList &&
-            data.content_file.length > 0) ||
-          !!data.content_url
-        );
-      }
-
-      return false;
-    },
-    {
-      message:
-        "Um arquivo (para Upload) ou uma URL válida (para Link) é obrigatório.",
-      path: ["content_url"], // O erro aponta para o campo de URL, mas a mensagem é genérica
-    }
-  )
-  // ✅ Thumbnail e TIPO DE ARQUIVO (validações atualizadas aqui)
-  .superRefine((data, ctx) => {
-    // 1. Valida URL da thumbnail (se existir)
-    if (data.thumbnail_url) {
-      if (!z.string().url().safeParse(data.thumbnail_url).success) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["thumbnail_url"],
-          message: "Informe uma URL válida para a thumbnail.",
-        });
-      }
+      issue(
+        "content_url",
+        isUpload
+          ? "Envie o arquivo do anúncio."
+          : "Informe uma URL válida (começando com https://)."
+      );
     }
 
-    // 2. Valida arquivo de thumbnail (se existir, verifica se é imagem)
-    if (
-      data.thumbnail_file &&
-      data.thumbnail_file instanceof FileList &&
-      data.thumbnail_file.length > 0
-    ) {
-      const file = data.thumbnail_file[0];
-      const uploadError = file.type.startsWith("image/")
-        ? validateUploadFile(file)
-        : "O arquivo da thumbnail deve ser uma imagem.";
-      if (uploadError) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["thumbnail_file"],
-          message: uploadError,
-        });
-      }
-    }
-
-    // 3. Valida arquivo de conteúdo principal (tipo e tamanho)
-    if (
-      (data.type === AdvertisementType.IMAGE_UPLOAD ||
-        data.type === AdvertisementType.VIDEO_UPLOAD) &&
-      data.content_file &&
-      data.content_file instanceof FileList &&
-      data.content_file.length > 0
-    ) {
-      const file = data.content_file[0];
-      const expectedPrefix =
-        data.type === AdvertisementType.IMAGE_UPLOAD ? "image/" : "video/";
-      const uploadError = file.type.startsWith(expectedPrefix)
-        ? validateUploadFile(file)
-        : data.type === AdvertisementType.IMAGE_UPLOAD
-          ? "O arquivo de conteúdo deve ser uma imagem."
-          : "O arquivo de conteúdo deve ser um vídeo.";
-      if (uploadError) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["content_file"],
-          message: uploadError,
-        });
-      }
+    if (data.thumbnail_url && !isHttpUrl(data.thumbnail_url)) {
+      issue("thumbnail_url", "Informe uma URL válida para a capa.");
     }
   });
 

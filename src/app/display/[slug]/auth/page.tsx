@@ -2,13 +2,7 @@
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { PasswordForm } from "@/components/auth/PasswordForm";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import styles from "@/components/auth/auth.module.css";
 import { getDisplayCompany, hasDisplayAccess } from "@/lib/display";
 import { displayTokenCookieName } from "@/lib/display-token";
 
@@ -35,18 +29,10 @@ export default async function CompanyAuthPage({
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-muted/40 p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl">Acesso Restrito</CardTitle>
-          <CardDescription>
-            Por favor, insira a senha para visualizar esta página de anúncios.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <PasswordForm slug={slug} />
-        </CardContent>
-      </Card>
+    <main className={styles.page}>
+      <div className={styles.stack}>
+        <PasswordForm slug={slug} />
+      </div>
     </main>
   );
 }

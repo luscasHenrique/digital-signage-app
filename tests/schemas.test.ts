@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { companySchema, userFormSchema } from "@/lib/schemas";
-import { UserRole } from "@/types";
+import {
+  advertisementFormSchema,
+  companySchema,
+  userFormSchema,
+} from "@/lib/schemas";
+import {
+  AdvertisementStatus,
+  AdvertisementType,
+  OverlayPosition,
+  UserRole,
+} from "@/types";
 
 const base = { name: "Empresa X", slug: "empresa-x" };
 
@@ -28,8 +37,11 @@ describe("companySchema", () => {
 
   it("valida o formato do slug", () => {
     expect(
-      companySchema.safeParse({ ...base, slug: "Com Espaço", is_private: false })
-        .success
+      companySchema.safeParse({
+        ...base,
+        slug: "Com Espaço",
+        is_private: false,
+      }).success
     ).toBe(false);
   });
 });
@@ -51,5 +63,68 @@ describe("userFormSchema", () => {
         role: "SUPERADMIN",
       }).success
     ).toBe(false);
+  });
+});
+
+describe("advertisementFormSchema", () => {
+  const valid = {
+    title: "Promoção",
+    type: AdvertisementType.IMAGE_LINK,
+    content_url: "https://exemplo.com/a.png",
+    start_date: new Date(2026, 9, 1),
+    end_date: new Date(2026, 9, 31),
+    duration_seconds: "10",
+    status: AdvertisementStatus.ACTIVE,
+    company_ids: ["c1"],
+    overlay_position: OverlayPosition.BOTTOM,
+  };
+
+  const errorsOf = (data: object) => {
+    const result = advertisementFormSchema.safeParse(data);
+    return result.success ? {} : result.error.flatten().fieldErrors;
+  };
+
+  it("aceita um anúncio completo", () => {
+    expect(advertisementFormSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("exige tipo, datas, empresas e duração mínima", () => {
+    const errors = errorsOf({
+      ...valid,
+      type: undefined,
+      start_date: null,
+      end_date: null,
+      company_ids: [],
+      duration_seconds: "3",
+    });
+    expect(Object.keys(errors).sort()).toEqual([
+      "company_ids",
+      "duration_seconds",
+      "end_date",
+      "start_date",
+      "type",
+    ]);
+  });
+
+  it("rejeita data final antes da inicial", () => {
+    expect(
+      errorsOf({ ...valid, end_date: new Date(2026, 8, 1) }).end_date
+    ).toBeDefined();
+  });
+
+  it("pede o arquivo para tipos de upload e URL válida para links", () => {
+    expect(
+      errorsOf({
+        ...valid,
+        type: AdvertisementType.VIDEO_UPLOAD,
+        content_url: "",
+      }).content_url
+    ).toEqual(["Envie o arquivo do anúncio."]);
+    expect(
+      errorsOf({ ...valid, content_url: "javascript:alert(1)" }).content_url
+    ).toBeDefined();
+    expect(
+      errorsOf({ ...valid, thumbnail_url: "não é url" }).thumbnail_url
+    ).toBeDefined();
   });
 });

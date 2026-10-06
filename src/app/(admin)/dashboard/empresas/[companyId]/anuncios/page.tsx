@@ -85,18 +85,12 @@ export default async function CompanyAdsPage({ params }: { params: Params }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold">Anúncios – {company.name}</h1>
-        <p className="text-muted-foreground">
-          Gerencie os anúncios vinculados a <strong>{company.name}</strong>.
-        </p>
-      </div>
-
-      <AdvertisementsClient
-        initialAdvertisements={filteredAds}
-        companies={allCompanies as Company[]}
-      />
-    </div>
+    <AdvertisementsClient
+      initialAdvertisements={filteredAds}
+      companies={allCompanies as Company[]}
+      title={`Anúncios · ${company.name}`}
+      description={`Anúncios exibidos na tela /display/${company.slug}.`}
+      defaultCompanyId={company.id}
+    />
   );
 }

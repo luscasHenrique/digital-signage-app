@@ -1,0 +1,111 @@
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--lg-font-sans);
+  font-size: var(--lg-text-sm);
+  color: var(--lg-text-secondary);
+}
+
+.list[data-size="sm"] {
+  font-size: var(--lg-text-xs);
+}
+
+.list[data-variant="glass"] {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 4px 6px;
+  border-radius: var(--lg-radius-full);
+  background: var(--lg-glass-bg);
+  -webkit-backdrop-filter: var(--lg-glass-filter);
+  backdrop-filter: var(--lg-glass-filter);
+  box-shadow: var(--lg-glass-shadow);
+}
+
+.item {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  max-width: 220px;
+  padding: 0 8px;
+  border-radius: var(--lg-radius-full);
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  transition:
+    background var(--lg-duration-fast) ease,
+    color var(--lg-duration-fast) ease,
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+
+.list[data-size="sm"] .link {
+  height: 24px;
+  padding: 0 6px;
+}
+
+a.link:hover,
+button.link:hover {
+  color: var(--lg-text);
+  background: var(--lg-fill);
+}
+
+a.link:active,
+button.link:active {
+  transform: scale(0.95);
+}
+
+.link:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--lg-focus-border);
+}
+
+.static {
+  cursor: default;
+}
+
+.current {
+  color: var(--lg-text);
+  font-weight: var(--lg-weight-semibold);
+}
+.list[data-variant="glass"] .current {
+  background: var(--lg-selected-bg);
+  box-shadow: var(--lg-selected-shadow);
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.ellipsis {
+  min-width: 28px;
+  justify-content: center;
+  letter-spacing: 0.08em;
+  font-weight: var(--lg-weight-bold);
+}
+
+.separator {
+  display: inline-flex;
+  align-items: center;
+  color: var(--lg-text-tertiary);
+  opacity: 0.8;
+}

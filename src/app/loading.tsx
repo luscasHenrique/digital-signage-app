@@ -1,12 +1,10 @@
 // src/app/loading.tsx
-import { Loader2 } from "lucide-react";
+import { Loading } from "@/components/ui/Loading/Loading";
 
-export default function Loading() {
-  // Este componente será exibido automaticamente pelo Next.js
-  // enquanto o conteúdo da página está sendo carregado no servidor.
+export default function RootLoading() {
   return (
-    <div className="flex h-screen w-full items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    <div className="grid min-h-dvh place-items-center">
+      <Loading size="lg" label="Carregando..." labelPlacement="bottom" />
     </div>
   );
 }

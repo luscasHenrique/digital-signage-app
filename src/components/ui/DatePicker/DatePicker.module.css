@@ -1,0 +1,131 @@
+.control {
+  cursor: pointer;
+  padding-left: 0;
+}
+
+.control[data-open="true"] {
+  --field-ring: var(--lg-focus-border);
+  background: var(--lg-field-bg-focus);
+  box-shadow:
+    inset 0 0 0 1px var(--field-ring);
+}
+
+.trigger {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--lg-space-2);
+  height: var(--field-h);
+  padding-left: var(--field-px);
+  text-align: left;
+  outline: none;
+  font-size: var(--lg-text-md);
+  color: inherit;
+}
+
+.control[data-size="sm"] .trigger {
+  font-size: var(--lg-text-sm);
+}
+.control[data-size="lg"] .trigger {
+  font-size: var(--lg-text-lg);
+}
+
+.control[data-open="true"] .icon {
+  color: var(--lg-accent);
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.placeholder {
+  color: var(--lg-field-placeholder);
+}
+
+/* ---------- Painel ---------- */
+.panel {
+  padding: 14px;
+}
+
+.content {
+  display: flex;
+  gap: 14px;
+}
+
+.presets {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 140px;
+  padding-right: 14px;
+  border-right: 1px solid var(--lg-separator);
+}
+
+.preset {
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--lg-radius-sm);
+  text-align: left;
+  font-size: var(--lg-text-sm);
+  font-weight: var(--lg-weight-medium);
+  white-space: nowrap;
+  transition: background var(--lg-duration-fast) ease;
+}
+.preset:hover {
+  background: var(--lg-fill);
+}
+.preset:focus-visible {
+  outline: 2px solid var(--lg-accent);
+}
+
+@media (max-width: 560px) {
+  .content {
+    flex-direction: column;
+  }
+  .presets {
+    flex-direction: row;
+    flex-wrap: wrap;
+    min-width: 0;
+    padding: 0 0 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--lg-separator);
+  }
+}
+
+.calendarWrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--lg-separator);
+}
+
+.footerButton {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--lg-radius-sm);
+  font-size: var(--lg-text-sm);
+  font-weight: var(--lg-weight-semibold);
+  color: var(--lg-accent);
+  transition: background var(--lg-duration-fast) ease;
+}
+.footerButton:hover {
+  background: var(--lg-accent-soft);
+}
+.footerButton[data-muted] {
+  color: var(--lg-text-secondary);
+}
+.footerButton[data-muted]:hover {
+  background: var(--lg-fill);
+}

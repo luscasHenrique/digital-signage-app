@@ -1,0 +1,164 @@
+.root {
+  --cb-size: 20px;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  font-family: var(--lg-font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.root[data-size="sm"] {
+  --cb-size: 16px;
+  gap: 8px;
+}
+
+.root[data-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.control {
+  position: relative;
+  display: inline-grid;
+  flex-shrink: 0;
+  width: var(--cb-size);
+  height: var(--cb-size);
+  margin-top: 1px;
+}
+
+.input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+  z-index: 1;
+}
+
+.box {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  background: var(--lg-field-bg);
+  box-shadow:
+    inset 0 0 0 1.5px var(--lg-field-border-hover),
+    inset 0 1px 1px rgba(0, 0, 0, 0.04);
+  color: #fff;
+  transition:
+    background var(--lg-duration-fast) ease,
+    box-shadow var(--lg-duration-base) var(--lg-ease-out),
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+
+.root[data-size="sm"] .box {
+  border-radius: 5px;
+}
+
+.box svg {
+  grid-area: 1 / 1;
+  width: 78%;
+  height: 78%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.check path {
+  stroke-dasharray: 16;
+  stroke-dashoffset: 16;
+  transition: stroke-dashoffset var(--lg-duration-base) var(--lg-ease-out);
+}
+
+.dash {
+  opacity: 0;
+  transform: scaleX(0.3);
+  transition:
+    opacity var(--lg-duration-fast) ease,
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+
+.root:hover .box {
+  box-shadow:
+    inset 0 0 0 1.5px var(--lg-text-tertiary),
+    inset 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.input:active + .box {
+  transform: scale(0.88);
+}
+
+.input:focus-visible + .box {
+  box-shadow:
+    inset 0 0 0 1.5px var(--lg-focus-border),
+    0 0 0 3px var(--lg-focus-ring);
+}
+
+.input:checked + .box,
+.input[data-indeterminate="true"] + .box {
+  background: var(--lg-accent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 2px 6px -2px var(--lg-accent);
+}
+
+.input:checked:not([data-indeterminate="true"]) + .box .check path {
+  stroke-dashoffset: 0;
+}
+
+.input[data-indeterminate="true"] + .box .dash {
+  opacity: 1;
+  transform: none;
+}
+
+.root[data-invalid="true"] .box {
+  box-shadow: inset 0 0 0 1.5px var(--lg-danger);
+  animation: shake 0.4s var(--lg-ease-out);
+}
+.root[data-invalid="true"] .input:checked + .box {
+  background: var(--lg-danger);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--lg-text-md);
+  line-height: 1.4;
+  color: var(--lg-text);
+}
+
+.root[data-size="sm"] .label {
+  font-size: var(--lg-text-sm);
+}
+
+.description {
+  font-size: var(--lg-text-sm);
+  color: var(--lg-text-tertiary);
+  line-height: 1.4;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+}

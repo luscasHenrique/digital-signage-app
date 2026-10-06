@@ -1,74 +1,68 @@
 // src/components/auth/PasswordForm.tsx
 "use client";
 
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { Lock } from "lucide-react";
 import { verifyCompanyPassword } from "@/actions/companies";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { LoadingButton } from "@/components/ui/loading-button";
-
-const passwordSchema = z.object({
-  password: z.string().min(1, "A senha é obrigatória."),
-});
-type PasswordSchema = z.infer<typeof passwordSchema>;
+import { AuthCard } from "@/components/ui/Auth/AuthCard";
+import { Button } from "@/components/ui/Button/Button";
+import { TextField } from "@/components/ui/TextField/TextField";
+import styles from "./auth.module.css";
 
 export function PasswordForm({ slug }: { slug: string }) {
   const router = useRouter();
-  const form = useForm<PasswordSchema>({
-    resolver: zodResolver(passwordSchema),
-    defaultValues: { password: "" },
-  });
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const onSubmit = async (data: PasswordSchema) => {
-    const result = await verifyCompanyPassword({
-      slug,
-      password: data.password,
-    });
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!password) {
+      setError("A senha é obrigatória.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    const result = await verifyCompanyPassword({ slug, password });
+    setSubmitting(false);
 
     if (result.success) {
-      toast.success(result.message);
-      // Força um refresh para que o middleware possa revalidar com o novo cookie
+      // Recarrega para a página validar o novo cookie e liberar o display
       router.refresh();
     } else {
-      toast.error(result.message);
+      setError(result.message);
     }
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Senha de Acesso</FormLabel>
-              <FormControl>
-                <Input type="password" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+    <AuthCard
+      logo={
+        <span className={styles.logo}>
+          <Lock size={20} />
+        </span>
+      }
+      title="Acesso restrito"
+      subtitle="Insira a senha para visualizar esta página de anúncios."
+    >
+      <form className={styles.form} onSubmit={onSubmit} noValidate>
+        <TextField
+          type="password"
+          label="Senha de acesso"
+          autoComplete="current-password"
+          autoFocus
+          value={password}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            if (error) setError(null);
+          }}
+          error={error}
         />
-        <LoadingButton
-          type="submit"
-          className="w-full"
-          loading={form.formState.isSubmitting}
-        >
+        <Button type="submit" fullWidth size="lg" loading={submitting}>
           Entrar
-        </LoadingButton>
+        </Button>
       </form>
-    </Form>
+    </AuthCard>
   );
 }

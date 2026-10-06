@@ -1,0 +1,103 @@
+/* ==========================================================================
+   Liquid Glass — Receita de vidro + utilitários globais
+   Use .lg-glass em qualquer elemento para aplicar a superfície de vidro.
+   ========================================================================== */
+
+.lg-glass {
+  position: relative;
+  background: var(--lg-glass-bg);
+  -webkit-backdrop-filter: var(--lg-glass-filter);
+  backdrop-filter: var(--lg-glass-filter);
+  box-shadow: var(--lg-glass-shadow);
+}
+
+.lg-glass-strong {
+  position: relative;
+  background: var(--lg-glass-bg-strong);
+  -webkit-backdrop-filter: var(--lg-glass-filter-strong);
+  backdrop-filter: var(--lg-glass-filter-strong);
+  box-shadow: var(--lg-glass-shadow);
+}
+
+/* Fundo ambiente: grade sutil + "blobs" coloridos que dão vida ao vidro */
+.lg-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background-color: var(--lg-bg);
+  background-image: linear-gradient(var(--lg-bg-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--lg-bg-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  transition: background-color var(--lg-duration-slow) var(--lg-ease-out);
+}
+
+.lg-ambient > span {
+  position: absolute;
+  width: 46vmax;
+  height: 46vmax;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: var(--lg-blob-opacity);
+  transition: background-color var(--lg-duration-slow) var(--lg-ease-out);
+  animation: lg-float 22s var(--lg-ease-in-out) infinite alternate;
+}
+
+.lg-ambient > span:nth-child(1) {
+  background: var(--lg-blob-1);
+  top: -18vmax;
+  left: -12vmax;
+}
+.lg-ambient > span:nth-child(2) {
+  background: var(--lg-blob-2);
+  top: -16vmax;
+  right: -14vmax;
+  animation-delay: -6s;
+}
+.lg-ambient > span:nth-child(3) {
+  background: var(--lg-blob-3);
+  bottom: -26vmax;
+  left: 10vmax;
+  animation-delay: -12s;
+}
+.lg-ambient > span:nth-child(4) {
+  background: var(--lg-blob-4);
+  bottom: -20vmax;
+  right: -18vmax;
+  animation-delay: -3s;
+}
+
+@keyframes lg-float {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(4vmax, 3vmax, 0) scale(1.08);
+  }
+  100% {
+    transform: translate3d(-3vmax, 5vmax, 0) scale(0.95);
+  }
+}
+
+/* Transição suave ao trocar de tema */
+.lg-theme-transition,
+.lg-theme-transition *,
+.lg-theme-transition *::before,
+.lg-theme-transition *::after {
+  transition-property: background-color, color, border-color, box-shadow, fill, stroke !important;
+  transition-duration: var(--lg-duration-slow) !important;
+  transition-timing-function: var(--lg-ease-out) !important;
+}
+
+.lg-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

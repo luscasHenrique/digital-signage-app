@@ -1,81 +1,123 @@
+// src/components/admin/advertisements/AdvertisementForm.tsx
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useState, type ReactNode } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { CalendarIcon, ImageIcon } from "lucide-react";
-import { RgbaColorPicker } from "@/components/ui/RgbaColorPicker";
-import { ALLOWED_IMAGE_TYPES } from "@/lib/storage";
-
+import {
+  Clapperboard,
+  FileImage,
+  FileVideo,
+  Image as ImageIcon,
+  Link2,
+  Youtube,
+} from "lucide-react";
+import {
+  createAdvertisement,
+  updateAdvertisement,
+} from "@/actions/advertisements";
+import { Button } from "@/components/ui/Button/Button";
+import { DatePicker } from "@/components/ui/DatePicker/DatePicker";
+import {
+  FileUpload,
+  type UploadFile,
+} from "@/components/ui/FileUpload/FileUpload";
+import { MultiSelect } from "@/components/ui/MultiSelect/MultiSelect";
+import { SegmentedControl } from "@/components/ui/SegmentedControl/SegmentedControl";
+import { Select } from "@/components/ui/Select/Select";
+import { Switch } from "@/components/ui/Switch/Switch";
+import { TextField } from "@/components/ui/TextField/TextField";
+import { Textarea } from "@/components/ui/Textarea/Textarea";
+import { useToast } from "@/components/ui/Toast/Toast";
+import {
+  AD_TYPE_LABEL,
+  endOfDay,
+  isUploadType,
+  isVideoType,
+  startOfDay,
+} from "@/lib/advertisement-display";
+import { applyActionErrors } from "@/lib/form-errors";
+import {
+  advertisementFormSchema,
+  type AdvertisementFormSchemaData,
+} from "@/lib/schemas";
+import {
+  ALLOWED_IMAGE_TYPES,
+  ALLOWED_VIDEO_TYPES,
+  MAX_IMAGE_BYTES,
+  MAX_VIDEO_BYTES,
+} from "@/lib/storage";
 import {
   AdvertisementStatus,
   AdvertisementType,
   Company,
   OverlayPosition,
 } from "@/types";
-import {
-  createAdvertisement,
-  getSignedUploadUrl,
-  updateAdvertisement,
-} from "@/actions/advertisements";
-import { AdvertisementWithCompanies } from "./AdvertisementsClient";
+import type { AdvertisementWithCompanies } from "./AdvertisementsClient";
+import { ColorField } from "./ColorField";
+import { useStorageUpload } from "./useStorageUpload";
 
-// Schema e tipos centralizados
-import {
-  advertisementFormSchema,
-  AdvertisementFormSchemaData,
-} from "@/lib/schemas";
-
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { LoadingButton } from "@/components/ui/loading-button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Progress } from "@/components/ui/progress";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-
-// Subcomponentes
-import { CompanySelector } from "./CompanySelector";
-import { ContentFields } from "./ContentFields";
-
-// ✅ Tipo do payload aceito pelas actions (sem duplicar tipo/schema)
 type ActionInput = Parameters<typeof createAdvertisement>[0];
 
 interface AdvertisementFormProps {
   initialData: AdvertisementWithCompanies | null;
   companies: Company[];
+  /** Empresa já marcada ao criar (ex.: na página de anúncios de uma empresa) */
+  defaultCompanyId?: string;
   onSuccess: () => void;
+}
+
+const typeOptions = [
+  {
+    value: AdvertisementType.IMAGE_UPLOAD,
+    label: AD_TYPE_LABEL[AdvertisementType.IMAGE_UPLOAD],
+    description: "Envie um JPG, PNG, WEBP, GIF ou AVIF.",
+    icon: <FileImage />,
+  },
+  {
+    value: AdvertisementType.VIDEO_UPLOAD,
+    label: AD_TYPE_LABEL[AdvertisementType.VIDEO_UPLOAD],
+    description: "Envie um MP4, WEBM ou OGG.",
+    icon: <FileVideo />,
+  },
+  {
+    value: AdvertisementType.IMAGE_LINK,
+    label: AD_TYPE_LABEL[AdvertisementType.IMAGE_LINK],
+    description: "Endereço de uma imagem na internet.",
+    icon: <ImageIcon />,
+  },
+  {
+    value: AdvertisementType.VIDEO_LINK,
+    label: AD_TYPE_LABEL[AdvertisementType.VIDEO_LINK],
+    description: "Endereço direto de um arquivo de vídeo.",
+    icon: <Link2 />,
+  },
+  {
+    value: AdvertisementType.EMBED_LINK,
+    label: AD_TYPE_LABEL[AdvertisementType.EMBED_LINK],
+    description: "Link de um vídeo do YouTube.",
+    icon: <Youtube />,
+  },
+];
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-4 border-t border-border pt-5">
+      <h3 className="text-[length:var(--lg-text-md)]">{title}</h3>
+      {children}
+    </section>
+  );
 }
 
 export function AdvertisementForm({
   initialData,
   companies,
+  defaultCompanyId,
   onSuccess,
 }: AdvertisementFormProps) {
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const toast = useToast();
+  const { createUploadHandler, keep } = useStorageUpload();
+  const [uploading, setUploading] = useState({ content: false, thumb: false });
 
   const form = useForm<AdvertisementFormSchemaData>({
     resolver: zodResolver(advertisementFormSchema),
@@ -85,506 +127,436 @@ export function AdvertisementForm({
       description: initialData?.description || "",
       type: initialData?.type,
       content_url: initialData?.content_url || "",
-
-      // thumbnail
       thumbnail_url: initialData?.thumbnail_url ?? "",
-      thumbnail_file: undefined,
-
       start_date: initialData?.start_date
         ? new Date(initialData.start_date)
-        : null,
+        : startOfDay(new Date()),
       end_date: initialData?.end_date ? new Date(initialData.end_date) : null,
       duration_seconds: String(initialData?.duration_seconds || 15),
       status: initialData?.status || AdvertisementStatus.ACTIVE,
-      company_ids: initialData?.companies.map((c) => c.id) || [],
+      company_ids:
+        initialData?.companies.map((c) => c.id) ??
+        (defaultCompanyId ? [defaultCompanyId] : []),
       overlay_text: initialData?.overlay_text || "",
       overlay_position: initialData?.overlay_position || OverlayPosition.BOTTOM,
-      overlay_bg_color: initialData?.overlay_bg_color || "#000000",
+      overlay_bg_color: initialData?.overlay_bg_color || "rgba(0, 0, 0, 0.55)",
       overlay_text_color: initialData?.overlay_text_color || "#FFFFFF",
     },
   });
+  const { errors, isSubmitting } = form.formState;
 
   const adType = form.watch("type");
+  const contentUrl = form.watch("content_url");
+  const startDate = form.watch("start_date");
   const overlayText = form.watch("overlay_text");
+  const overlay = form.watch([
+    "overlay_position",
+    "overlay_bg_color",
+    "overlay_text_color",
+  ]);
+  const isUploading = uploading.content || uploading.thumb;
+
+  const trackUploads = (key: "content" | "thumb") => (files: UploadFile[]) =>
+    setUploading((prev) => ({
+      ...prev,
+      [key]: files.some((f) => f.status === "uploading"),
+    }));
 
   const onSubmit = async (data: AdvertisementFormSchemaData) => {
-    if (!data.start_date || !data.end_date || !data.type) {
-      toast.error(
-        "Por favor, preencha todos os campos obrigatórios (Tipo, Data de Início, Data de Fim)."
-      );
-      return;
-    }
+    if (!data.type || !data.start_date || !data.end_date) return;
 
-    let finalContentUrl = data.content_url;
-    let finalThumbnailUrl = data.thumbnail_url;
+    const finalData: ActionInput = {
+      id: data.id,
+      title: data.title,
+      description: data.description,
+      type: data.type,
+      content_url: data.content_url,
+      // A capa só vale para vídeos
+      thumbnail_url: isVideoType(data.type) ? data.thumbnail_url : "",
+      start_date: startOfDay(data.start_date).toISOString(),
+      // O anúncio fica no ar até o fim do último dia
+      end_date: endOfDay(data.end_date).toISOString(),
+      duration_seconds: Number(data.duration_seconds),
+      status: data.status,
+      company_ids: data.company_ids,
+      overlay_text: data.overlay_text,
+      overlay_position: data.overlay_position,
+      overlay_bg_color: data.overlay_bg_color,
+      overlay_text_color: data.overlay_text_color,
+    };
 
-    // ✅ Tipar corretamente os arquivos vindos do form
-    const file = (data.content_file as FileList | undefined)?.[0];
-    const thumbFile = (data.thumbnail_file as FileList | undefined)?.[0];
+    const action = initialData ? updateAdvertisement : createAdvertisement;
+    const result = await action(finalData);
 
-    const isUpload =
-      data.type === AdvertisementType.IMAGE_UPLOAD ||
-      data.type === AdvertisementType.VIDEO_UPLOAD;
-
-    try {
-      setIsUploading(true);
-      setUploadProgress(5);
-
-      // 1) Upload do conteúdo principal, se for upload
-      if (isUpload && file) {
-        const signedUrlResult = await getSignedUploadUrl({
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size,
-        });
-        if (!signedUrlResult.success || !signedUrlResult.data) {
-          toast.error(String(signedUrlResult.message));
-          setIsUploading(false);
-          return;
-        }
-        const { url, publicUrl } = signedUrlResult.data;
-
-        setUploadProgress(25);
-        const uploadResponse = await fetch(url, {
-          method: "PUT",
-          body: file,
-          headers: { "Content-Type": file.type },
-        });
-        if (!uploadResponse.ok) {
-          toast.error("Falha no upload do arquivo do anúncio.");
-          setIsUploading(false);
-          return;
-        }
-        finalContentUrl = publicUrl;
-      }
-
-      setUploadProgress(50);
-
-      // 2) Upload da THUMBNAIL (obrigatória quando VIDEO_UPLOAD)
-      if (
-        data.type === AdvertisementType.VIDEO_UPLOAD ||
-        data.type === AdvertisementType.VIDEO_LINK
-      ) {
-        if (thumbFile) {
-          const signedThumb = await getSignedUploadUrl({
-            fileName: thumbFile.name,
-            fileType: thumbFile.type,
-            fileSize: thumbFile.size,
-          });
-          if (!signedThumb.success || !signedThumb.data) {
-            toast.error(String(signedThumb.message));
-            setIsUploading(false);
-            return;
-          }
-          const { url: thumbUrl, publicUrl: thumbPublicUrl } =
-            signedThumb.data;
-
-          setUploadProgress(70);
-          const uploadThumbResp = await fetch(thumbUrl, {
-            method: "PUT",
-            body: thumbFile,
-            headers: { "Content-Type": thumbFile.type },
-          });
-          if (!uploadThumbResp.ok) {
-            toast.error("Falha no upload da thumbnail.");
-            setIsUploading(false);
-            return;
-          }
-          finalThumbnailUrl = thumbPublicUrl;
-        }
-        // Se não teve arquivo, usaremos a thumbnail_url já informada no input (validada no schema)
-      }
-
-      setUploadProgress(100);
-
-      // ✅ Tipar o payload da action (e remover campos de arquivo)
-      const finalData: ActionInput = {
-        id: data.id,
-        title: data.title,
-        description: data.description,
-        type: data.type,
-        content_url: finalContentUrl,
-        thumbnail_url: finalThumbnailUrl,
-        start_date: data.start_date.toISOString(),
-        end_date: data.end_date.toISOString(),
-        duration_seconds: Number(data.duration_seconds),
-        status: data.status,
-        company_ids: data.company_ids,
-        overlay_text: data.overlay_text,
-        overlay_position: data.overlay_position,
-        overlay_bg_color: data.overlay_bg_color,
-        overlay_text_color: data.overlay_text_color,
-      };
-
-      const action = initialData ? updateAdvertisement : createAdvertisement;
-      const result = await action(finalData);
-
-      setIsUploading(false);
-
-      if (result.success) {
-        toast.success(String(result.message));
-        onSuccess();
-      } else {
-        if (result.message && typeof result.message === "object") {
-          Object.entries(result.message).forEach(([key, value]) => {
-            if (key === "_server") toast.error((value as string[]).join(", "));
-            else
-              form.setError(key as keyof AdvertisementFormSchemaData, {
-                message: (value as string[]).join(", "),
-              });
-          });
-        } else {
-          toast.error(String(result.message ?? "Erro ao salvar anúncio."));
-        }
-      }
-    } catch (e) {
-      setIsUploading(false);
-      toast.error("Erro inesperado ao salvar anúncio.");
-      console.error(e);
+    if (result.success) {
+      keep([finalData.content_url, finalData.thumbnail_url]);
+      toast.success(String(result.message));
+      onSuccess();
+    } else {
+      applyActionErrors(result.message, form.setError, toast.error);
     }
   };
 
+  const companyOptions = companies.map((c) => ({
+    value: c.id,
+    label: c.name,
+    description: `/display/${c.slug}`,
+  }));
+
+  const hasExistingUpload =
+    isUploadType(adType) && !!contentUrl && adType === initialData?.type;
+
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1  gap-6">
-          <FormField
+    <form
+      onSubmit={form.handleSubmit(onSubmit)}
+      className="flex flex-col gap-5"
+      noValidate
+    >
+      <Controller
+        control={form.control}
+        name="title"
+        render={({ field }) => (
+          <TextField
+            {...field}
+            label="Título"
+            placeholder="Ex.: Promoção de inverno"
+            required
+            error={errors.title?.message}
+          />
+        )}
+      />
+
+      <div className="grid gap-4 sm:grid-cols-[1fr_160px]">
+        <Controller
+          control={form.control}
+          name="type"
+          render={({ field }) => (
+            <Select
+              label="Tipo de anúncio"
+              placeholder="Selecione o tipo"
+              options={typeOptions}
+              value={field.value ?? null}
+              onValueChange={(value) => {
+                if (!value || value === field.value) return;
+                field.onChange(value as AdvertisementType);
+                // Conteúdo de um tipo não serve para outro
+                form.setValue("content_url", "");
+                form.setValue("thumbnail_url", "");
+                form.clearErrors(["content_url", "thumbnail_url"]);
+              }}
+              required
+              error={errors.type?.message}
+            />
+          )}
+        />
+        <Controller
+          control={form.control}
+          name="duration_seconds"
+          render={({ field }) => (
+            <TextField
+              {...field}
+              type="number"
+              min={5}
+              inputMode="numeric"
+              label="Duração"
+              rightIcon={<span className="text-sm">seg</span>}
+              error={errors.duration_seconds?.message}
+            />
+          )}
+        />
+      </div>
+
+      {/* Conteúdo: arquivo ou link, conforme o tipo */}
+      {adType &&
+        (isUploadType(adType) ? (
+          <div className="flex flex-col gap-2">
+            <FileUpload
+              key={adType}
+              label="Arquivo do anúncio"
+              multiple={false}
+              accept={(adType === AdvertisementType.IMAGE_UPLOAD
+                ? ALLOWED_IMAGE_TYPES
+                : ALLOWED_VIDEO_TYPES
+              ).join(",")}
+              maxSize={
+                adType === AdvertisementType.IMAGE_UPLOAD
+                  ? MAX_IMAGE_BYTES
+                  : MAX_VIDEO_BYTES
+              }
+              title={
+                hasExistingUpload
+                  ? "Arraste um novo arquivo para substituir"
+                  : "Arraste o arquivo aqui"
+              }
+              upload={createUploadHandler((url) => {
+                form.setValue("content_url", url);
+                form.clearErrors("content_url");
+              })}
+              onFilesChange={trackUploads("content")}
+              error={errors.content_url?.message}
+            />
+            {hasExistingUpload && (
+              <p className="text-sm text-muted-foreground">
+                Arquivo atual:{" "}
+                <a
+                  href={contentUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-primary hover:underline"
+                >
+                  abrir em nova aba
+                </a>
+              </p>
+            )}
+          </div>
+        ) : (
+          <Controller
             control={form.control}
-            name="title"
+            name="content_url"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Título</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
+              <TextField
+                {...field}
+                value={field.value ?? ""}
+                type="url"
+                label={
+                  adType === AdvertisementType.EMBED_LINK
+                    ? "Link do YouTube"
+                    : "URL do conteúdo"
+                }
+                placeholder={
+                  adType === AdvertisementType.EMBED_LINK
+                    ? "https://www.youtube.com/watch?v=..."
+                    : "https://..."
+                }
+                leftIcon={<Link2 />}
+                required
+                error={errors.content_url?.message}
+              />
             )}
           />
+        ))}
 
-          <div className="grid grid-cols-2 gap-6">
-            <FormField
-              control={form.control}
-              name="type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tipo de Anúncio</FormLabel>
-                  <Select
-                    // ✅ tipar value para o enum
-                    onValueChange={(value: AdvertisementType) => {
-                      field.onChange(value);
-                      // limpar campos ao trocar o tipo
-                      form.setValue("content_url", "");
-                      form.setValue("content_file", undefined);
-                      form.setValue("thumbnail_url", "");
-                      form.setValue("thumbnail_file", undefined);
-                      form.clearErrors([
-                        "content_url",
-                        "content_file",
-                        "thumbnail_url",
-                        "thumbnail_file",
-                      ]);
-                    }}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o tipo" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value={AdvertisementType.IMAGE_UPLOAD}>
-                        Upload de Imagem
-                      </SelectItem>
-                      <SelectItem value={AdvertisementType.VIDEO_UPLOAD}>
-                        Upload de Vídeo
-                      </SelectItem>
-                      <SelectItem value={AdvertisementType.IMAGE_LINK}>
-                        Link de Imagem
-                      </SelectItem>
-                      <SelectItem value={AdvertisementType.VIDEO_LINK}>
-                        Link de Vídeo .MP4
-                      </SelectItem>
-                      <SelectItem value={AdvertisementType.EMBED_LINK}>
-                        Link de Incorporação (Embed)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
+      {/* Capa: só para vídeos */}
+      {isVideoType(adType) && (
+        <Section title="Capa do vídeo (opcional)">
+          <p className="-mt-2 text-sm text-muted-foreground">
+            Aparece na listagem de anúncios. Envie uma imagem ou informe a URL.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FileUpload
+              variant="compact"
+              multiple={false}
+              title="Enviar imagem"
+              accept={ALLOWED_IMAGE_TYPES.join(",")}
+              maxSize={MAX_IMAGE_BYTES}
+              upload={createUploadHandler((url) => {
+                form.setValue("thumbnail_url", url);
+                form.clearErrors("thumbnail_url");
+              })}
+              onFilesChange={trackUploads("thumb")}
             />
-
-            <ContentFields form={form} adType={adType} />
-
-            {/* Barra de progresso de upload */}
-            {isUploading && (
-              <div className="flex items-center gap-2 pt-2 col-span-2">
-                <Progress value={uploadProgress} className="w-full" />
-                <span className="text-sm text-muted-foreground">
-                  {uploadProgress}%
-                </span>
-              </div>
-            )}
-
-            <FormField
+            <Controller
               control={form.control}
-              name="duration_seconds"
+              name="thumbnail_url"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Duração (segundos)</FormLabel>
-                  <FormControl>
-                    <Input type="number" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+                <TextField
+                  {...field}
+                  value={field.value ?? ""}
+                  type="url"
+                  aria-label="URL da capa"
+                  placeholder="ou cole a URL da imagem"
+                  error={errors.thumbnail_url?.message}
+                />
               )}
             />
           </div>
+        </Section>
+      )}
 
-          {/* Datas */}
-          <div className="grid grid-cols-2 gap-6">
-            <FormField
-              control={form.control}
-              name="start_date"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Data de Início</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left font-normal"
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP", { locale: ptBR })
-                          ) : (
-                            <span>Escolha uma data</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value ?? undefined}
-                        onSelect={field.onChange}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="end_date"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Data de Fim</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left font-normal"
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP", { locale: ptBR })
-                          ) : (
-                            <span>Escolha uma data</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value ?? undefined}
-                        onSelect={field.onChange}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          {/* Empresas */}
-          <FormField
+      <Section title="Onde e quando exibir">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Controller
             control={form.control}
-            name="company_ids"
+            name="start_date"
             render={({ field }) => (
-              <CompanySelector field={field} companies={companies} />
+              <DatePicker
+                label="Início"
+                value={field.value}
+                onValueChange={field.onChange}
+                required
+                error={errors.start_date?.message}
+              />
             )}
           />
-
-          {/* Descrição */}
-          <FormField
+          <Controller
             control={form.control}
-            name="description"
+            name="end_date"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Descrição (Opcional)</FormLabel>
-                <FormControl>
-                  <Textarea {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
+              <DatePicker
+                label="Fim"
+                value={field.value}
+                onValueChange={field.onChange}
+                min={startDate ?? undefined}
+                hint="O anúncio fica no ar até o fim deste dia."
+                required
+                error={errors.end_date?.message}
+              />
             )}
           />
         </div>
-        {/* Overlay Opcional */}
-        <div className="space-y-4 rounded-lg border p-4">
-          <h3 className="text-lg font-medium">Overlay Opcional</h3>
-          <FormField
-            control={form.control}
-            name="overlay_text"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Texto do Overlay</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Escreva uma mensagem para sobrepor ao anúncio..."
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          {overlayText && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end animate-in fade-in-50">
-              <FormField
+
+        <Controller
+          control={form.control}
+          name="company_ids"
+          render={({ field }) => (
+            <MultiSelect
+              label="Empresas"
+              placeholder="Selecione as telas"
+              options={companyOptions}
+              value={field.value}
+              onValueChange={field.onChange}
+              searchable
+              selectAll
+              selectAllLabel="Todas as empresas"
+              required
+              error={errors.company_ids?.message}
+            />
+          )}
+        />
+
+        <Controller
+          control={form.control}
+          name="status"
+          render={({ field }) => (
+            <Switch
+              checked={field.value === AdvertisementStatus.ACTIVE}
+              onChange={(e) =>
+                field.onChange(
+                  e.target.checked
+                    ? AdvertisementStatus.ACTIVE
+                    : AdvertisementStatus.INACTIVE
+                )
+              }
+              tone="success"
+              label="Anúncio ativo"
+              description="Desative para tirar o anúncio das telas sem excluí-lo."
+            />
+          )}
+        />
+      </Section>
+
+      <Section title="Texto sobre o anúncio (opcional)">
+        <Controller
+          control={form.control}
+          name="overlay_text"
+          render={({ field }) => (
+            <Textarea
+              {...field}
+              value={field.value ?? ""}
+              aria-label="Texto do overlay"
+              placeholder="Mensagem exibida por cima do anúncio..."
+              maxLength={200}
+              showCount
+            />
+          )}
+        />
+
+        {overlayText && (
+          <>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Controller
                 control={form.control}
                 name="overlay_position"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Posição</FormLabel>
-                    <Select
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-sm font-medium">Posição</span>
+                    <SegmentedControl
+                      fullWidth
+                      ariaLabel="Posição do texto"
+                      value={field.value}
                       onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value={OverlayPosition.TOP}>
-                          Topo
-                        </SelectItem>
-                        <SelectItem value={OverlayPosition.BOTTOM}>
-                          Rodapé
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
+                      items={[
+                        { value: OverlayPosition.TOP, label: "Topo" },
+                        { value: OverlayPosition.BOTTOM, label: "Rodapé" },
+                      ]}
+                    />
+                  </div>
                 )}
               />
-
-              <FormField
+              <Controller
                 control={form.control}
                 name="overlay_bg_color"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cor do Fundo</FormLabel>
-                    <FormControl>
-                      <RgbaColorPicker field={field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+                  <ColorField
+                    label="Cor do fundo"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                  />
                 )}
               />
-              <FormField
+              <Controller
                 control={form.control}
                 name="overlay_text_color"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cor do Texto </FormLabel>
-                    <FormControl>
-                      <RgbaColorPicker field={field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+                  <ColorField
+                    label="Cor do texto"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                  />
                 )}
               />
             </div>
-          )}
-        </div>
-        {/* Thumbnail (só para vídeo upload) */}
-        {(adType === AdvertisementType.VIDEO_UPLOAD ||
-          adType === AdvertisementType.VIDEO_LINK) && (
-          <div className="space-y-4 rounded-lg border p-4">
-            <h3 className="text-lg font-medium flex items-center gap-2">
-              <ImageIcon className="h-4 w-4" />
-              Thumbnail (capa) — opcional para vídeo (upload ou link)
-            </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Upload de imagem */}
-              <FormField
-                control={form.control}
-                name="thumbnail_file"
-                render={() => (
-                  <FormItem>
-                    <FormLabel>Arquivo da Capa (imagem)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="file"
-                        accept={ALLOWED_IMAGE_TYPES.join(",")}
-                        onChange={(e) =>
-                          form.setValue(
-                            "thumbnail_file",
-                            e.target.files ?? undefined
-                          )
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Ou URL direta */}
-              <FormField
-                control={form.control}
-                name="thumbnail_url"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      URL da Capa (opcional, se não enviar arquivo)
-                    </FormLabel>
-                    <FormControl>
-                      <Input placeholder="https://..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            {/* Prévia de como o texto aparece na tela */}
+            <div
+              className="relative flex aspect-[16/5] overflow-hidden rounded-[var(--lg-radius-lg)] bg-gradient-to-br from-slate-700 to-slate-900"
+              style={{
+                alignItems:
+                  overlay[0] === OverlayPosition.TOP
+                    ? "flex-start"
+                    : "flex-end",
+              }}
+              aria-hidden="true"
+            >
+              <Clapperboard className="absolute left-1/2 top-1/2 size-8 -translate-x-1/2 -translate-y-1/2 text-white/30" />
+              <div
+                className="w-full px-3 py-2 text-center text-sm font-bold"
+                style={{ background: overlay[1], color: overlay[2] }}
+              >
+                {overlayText}
+              </div>
             </div>
-          </div>
+          </>
         )}
-        <LoadingButton
-          type="submit"
-          loading={form.formState.isSubmitting || isUploading}
-          className="w-full"
-        >
-          {isUploading
-            ? `Enviando (${uploadProgress}%)`
-            : initialData
-            ? "Salvar Alterações"
-            : "Criar Anúncio"}
-        </LoadingButton>
-      </form>
-    </Form>
+      </Section>
+
+      <Controller
+        control={form.control}
+        name="description"
+        render={({ field }) => (
+          <Textarea
+            {...field}
+            value={field.value ?? ""}
+            label="Observações internas"
+            optional
+            hint="Não aparece na tela."
+          />
+        )}
+      />
+
+      <Button
+        type="submit"
+        fullWidth
+        size="lg"
+        loading={isSubmitting}
+        disabled={isUploading}
+      >
+        {isUploading
+          ? "Aguardando envio do arquivo..."
+          : initialData
+            ? "Salvar alterações"
+            : "Criar anúncio"}
+      </Button>
+    </form>
   );
 }

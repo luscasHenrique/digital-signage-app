@@ -1,0 +1,111 @@
+.root {
+  --sw-w: 51px;
+  --sw-h: 31px;
+  --sw-pad: 2px;
+  --sw-knob: calc(var(--sw-h) - var(--sw-pad) * 2);
+  --sw-on: var(--lg-accent);
+
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+  font-family: var(--lg-font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.root[data-size="sm"] {
+  --sw-w: 38px;
+  --sw-h: 23px;
+}
+
+.root[data-tone="success"] {
+  --sw-on: var(--lg-success);
+}
+
+.root[data-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.reverse {
+  flex-direction: row-reverse;
+  justify-content: space-between;
+}
+
+.track {
+  position: relative;
+  flex-shrink: 0;
+  width: var(--sw-w);
+  height: var(--sw-h);
+  border-radius: var(--lg-radius-full);
+  background: var(--lg-fill-active);
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+  transition: background var(--lg-duration-base) var(--lg-ease-out);
+}
+
+.input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+  z-index: 1;
+}
+
+.knob {
+  position: absolute;
+  top: var(--sw-pad);
+  left: var(--sw-pad);
+  width: var(--sw-knob);
+  height: var(--sw-knob);
+  border-radius: var(--lg-radius-full);
+  background: #fff;
+  box-shadow:
+    0 3px 8px rgba(0, 0, 0, 0.15),
+    0 3px 1px rgba(0, 0, 0, 0.06),
+    0 0 0 0.5px rgba(0, 0, 0, 0.04);
+  transition:
+    transform var(--lg-duration-slow) var(--lg-ease-spring),
+    width var(--lg-duration-base) var(--lg-ease-out);
+}
+
+.input:checked ~ .knob {
+  transform: translateX(calc(var(--sw-w) - var(--sw-knob) - var(--sw-pad) * 2));
+}
+
+.track:has(.input:checked) {
+  background: var(--sw-on);
+}
+
+/* Estica o knob ao pressionar (como no iOS) */
+.input:active:not(:disabled) ~ .knob {
+  width: calc(var(--sw-knob) + 6px);
+}
+.input:checked:active:not(:disabled) ~ .knob {
+  transform: translateX(calc(var(--sw-w) - var(--sw-knob) - 6px - var(--sw-pad) * 2));
+}
+
+.input:focus-visible ~ .knob {
+  box-shadow:
+    0 0 0 3px var(--lg-focus-ring),
+    0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.label {
+  font-size: var(--lg-text-md);
+  color: var(--lg-text);
+  line-height: 1.35;
+}
+
+.description {
+  font-size: var(--lg-text-sm);
+  color: var(--lg-text-tertiary);
+  line-height: 1.4;
+}

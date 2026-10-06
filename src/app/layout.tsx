@@ -1,23 +1,29 @@
 // src/app/layout.tsx
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { Toaster } from "@/components/ui/sonner"; // Importar o Toaster
+import type { Metadata, Viewport } from "next";
+import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
+import { ThemeProvider } from "@/components/ui/Theme/ThemeProvider";
+import { ThemeScript } from "@/components/ui/Theme/ThemeScript";
+import { ToastProvider } from "@/components/ui/Toast/Toast";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
+const display = Fraunces({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: ["600", "800"],
 });
+const mono = JetBrains_Mono({ variable: "--font-mono", subsets: ["latin"] });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-// Metadados atualizados para o projeto
 export const metadata: Metadata = {
-  title: "Digital Signage",
+  title: { default: "Digital Signage", template: "%s · Digital Signage" },
   description: "Gerenciador de conteúdo para Digital Signage",
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#eef0f5" },
+    { media: "(prefers-color-scheme: dark)", color: "#06070b" },
+  ],
 };
 
 export default function RootLayout({
@@ -26,13 +32,27 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // Idioma atualizado para pt-BR
-    <html lang="pt-BR">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-        <Toaster richColors /> {/* Componente do Toaster adicionado */}
+    <html
+      lang="pt-BR"
+      data-theme="light"
+      suppressHydrationWarning
+      className={`${inter.variable} ${display.variable} ${mono.variable}`}
+    >
+      <head>
+        {/* Aplica o tema salvo antes da primeira pintura (sem flash) */}
+        <ThemeScript />
+      </head>
+      <body>
+        <ThemeProvider>
+          {/* Fundo ambiente que dá profundidade ao vidro */}
+          <div className="lg-ambient" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+          <ToastProvider>{children}</ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

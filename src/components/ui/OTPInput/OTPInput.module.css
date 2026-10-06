@@ -1,0 +1,110 @@
+.root {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.root[data-invalid="true"] {
+  animation: shake 0.42s var(--lg-ease-out);
+}
+
+.slotWrap {
+  display: contents;
+}
+
+.separator {
+  width: 10px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--lg-text-tertiary);
+  margin-inline: 2px;
+}
+
+.slot {
+  width: 48px;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  border-radius: var(--lg-radius-md);
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: var(--lg-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--lg-text);
+  caret-color: var(--lg-accent);
+  background: var(--lg-field-bg);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+  box-shadow: inset 0 0 0 1px var(--lg-field-border);
+  transition:
+    background var(--lg-duration-fast) ease,
+    box-shadow var(--lg-duration-base) var(--lg-ease-out),
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+
+.slot:hover {
+  background: var(--lg-field-bg-hover);
+}
+
+.slot:focus {
+  background: var(--lg-field-bg-focus);
+  box-shadow:
+    inset 0 0 0 1px var(--lg-focus-border);
+  transform: translateY(-2px);
+}
+
+.filled {
+  animation: pop var(--lg-duration-base) var(--lg-ease-spring);
+}
+
+.root[data-invalid="true"] .slot {
+  box-shadow: inset 0 0 0 1px var(--lg-danger-border);
+}
+.root[data-success="true"] .slot {
+  box-shadow: inset 0 0 0 1.5px var(--lg-success);
+}
+
+.slot:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 420px) {
+  .slot {
+    width: 40px;
+    height: 48px;
+    font-size: 1.25rem;
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.9);
+  }
+  60% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}

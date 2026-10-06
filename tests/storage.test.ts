@@ -82,9 +82,9 @@ describe("isOptimizableImage", () => {
     expect(
       isOptimizableImage("https://i.ytimg.com/vi/x/hqdefault.jpg", SUPABASE)
     ).toBe(true);
-    expect(isOptimizableImage("https://qualquer-site.com/a.png", SUPABASE)).toBe(
-      false
-    );
+    expect(
+      isOptimizableImage("https://qualquer-site.com/a.png", SUPABASE)
+    ).toBe(false);
     expect(isOptimizableImage(undefined, SUPABASE)).toBe(false);
   });
 });

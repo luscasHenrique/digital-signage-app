@@ -1,0 +1,7 @@
+/* Ponto de entrada único do design system.
+   Em outro projeto: importe este arquivo uma vez no layout raiz. */
+@layer lg-reset;
+
+@import "./tokens.css";
+@import "./reset.css";
+@import "./glass.css";

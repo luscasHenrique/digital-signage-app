@@ -36,11 +36,11 @@ export default async function Page({
     .order("created_at", { ascending: false });
 
   // Filtros
-  if (sp.table && sp.table.trim()) {
-    query = query.ilike("table_name", `%${sp.table.trim()}%`);
+  if (sp.table?.trim()) {
+    query = query.eq("table_name", sp.table.trim());
   }
-  if (sp.action && sp.action.trim()) {
-    query = query.ilike("action", `%${sp.action.trim()}%`);
+  if (sp.action?.trim()) {
+    query = query.eq("action", sp.action.trim().toUpperCase());
   }
   // O termo entra na sintaxe do filtro .or() do PostgREST: precisa ser sanitizado.
   const q = sanitizeAuditSearchTerm(sp.q);
@@ -109,7 +109,7 @@ export default async function Page({
     user_email: l.user_email,
     before_data: normalizeDetails(l.before_data),
     after_data: normalizeDetails(l.after_data),
-    actor: l.user_id ? profilesById[l.user_id] ?? null : null,
+    actor: l.user_id ? (profilesById[l.user_id] ?? null) : null,
   }));
 
   return (

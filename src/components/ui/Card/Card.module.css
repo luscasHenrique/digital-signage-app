@@ -1,0 +1,60 @@
+.card {
+  position: relative;
+  color: var(--lg-text);
+  background: var(--lg-glass-bg);
+  -webkit-backdrop-filter: var(--lg-glass-filter);
+  backdrop-filter: var(--lg-glass-filter);
+  box-shadow: var(--lg-glass-shadow);
+  transition:
+    transform var(--lg-duration-slow) var(--lg-ease-spring),
+    box-shadow var(--lg-duration-base) var(--lg-ease-out);
+}
+
+.card[data-variant="strong"] {
+  background: var(--lg-glass-bg-strong);
+  -webkit-backdrop-filter: var(--lg-glass-filter-strong);
+  backdrop-filter: var(--lg-glass-filter-strong);
+}
+
+.card[data-variant="flat"] {
+  background: var(--lg-fill);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.card[data-padding="none"] {
+  padding: 0;
+}
+.card[data-padding="sm"] {
+  padding: var(--lg-space-3);
+}
+.card[data-padding="md"] {
+  padding: var(--lg-space-6);
+}
+.card[data-padding="lg"] {
+  padding: var(--lg-space-10);
+}
+
+.card[data-radius="md"] {
+  border-radius: var(--lg-radius-md);
+}
+.card[data-radius="lg"] {
+  border-radius: var(--lg-radius-lg);
+}
+.card[data-radius="xl"] {
+  border-radius: var(--lg-radius-xl);
+}
+
+.interactive {
+  cursor: pointer;
+}
+.interactive:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    var(--lg-glass-shadow),
+    0 24px 48px -20px rgba(0, 0, 0, 0.25);
+}
+.interactive:active {
+  transform: translateY(0) scale(0.99);
+}

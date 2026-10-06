@@ -12,8 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/headers", () => ({
   cookies: async () => ({ set: mocks.cookieSet }),
-  headers: async () =>
-    new Headers({ "x-forwarded-for": mocks.ip }),
+  headers: async () => new Headers({ "x-forwarded-for": mocks.ip }),
 }));
 vi.mock("@/lib/auth", () => ({ getAuthContext: mocks.getAuthContext }));
 vi.mock("@/lib/supabase/admin", () => ({
@@ -67,7 +66,11 @@ describe("createCompany / updateCompany", () => {
 
   it("salva a senha como hash, nunca em texto puro (S2)", async () => {
     const user = useUserClient();
-    await createCompany({ ...company, is_private: true, password: "minha-senha" });
+    await createCompany({
+      ...company,
+      is_private: true,
+      password: "minha-senha",
+    });
 
     const [inserted] = findCall(user.log, "insert") as [{ password: string }];
     expect(isPasswordHash(inserted.password)).toBe(true);
@@ -121,7 +124,9 @@ describe("verifyCompanyPassword", () => {
   it("libera acesso com a senha correta e grava cookie httpOnly", async () => {
     mocks.ip = "10.0.0.2";
     useAdminClient({
-      companies: [{ data: { id: "c1", password: await hashPassword("certa") } }],
+      companies: [
+        { data: { id: "c1", password: await hashPassword("certa") } },
+      ],
     });
 
     const result = await verifyCompanyPassword({
@@ -156,12 +161,17 @@ describe("verifyCompanyPassword", () => {
   it("bloqueia após 5 tentativas erradas do mesmo IP (S5)", async () => {
     mocks.ip = "10.0.0.4";
     const hash = await hashPassword("certa");
-    mocks.adminFrom.mockImplementation(
-      () => fakeClient({ companies: [{ data: { id: "c1", password: hash } }] }).client.from("companies")
+    mocks.adminFrom.mockImplementation(() =>
+      fakeClient({
+        companies: [{ data: { id: "c1", password: hash } }],
+      }).client.from("companies")
     );
 
     for (let i = 0; i < 5; i++) {
-      const r = await verifyCompanyPassword({ slug: "empresa-x", password: "errada" });
+      const r = await verifyCompanyPassword({
+        slug: "empresa-x",
+        password: "errada",
+      });
       expect(r.message).toBe("Senha incorreta.");
     }
 

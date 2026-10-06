@@ -1,12 +1,16 @@
-// src/app/loading.tsx
-import { Loader2 } from "lucide-react";
+// src/app/(admin)/loading.tsx
+import { Skeleton } from "@/components/ui/Skeleton/Skeleton";
 
-export default function Loading() {
-  // Este componente será exibido automaticamente pelo Next.js
-  // enquanto o conteúdo da página está sendo carregado no servidor.
+// Esqueleto com o mesmo formato das páginas do painel (título + conteúdo)
+export default function AdminLoading() {
   return (
-    <div className="flex h-screen w-full items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    <div className="flex flex-col gap-6" aria-busy="true">
+      <div className="flex flex-col gap-2">
+        <Skeleton variant="text" width={220} height={28} />
+        <Skeleton variant="text" width={320} />
+      </div>
+      <Skeleton height={56} radius="var(--lg-radius-lg)" />
+      <Skeleton height={360} radius="var(--lg-radius-xl)" />
     </div>
   );
 }

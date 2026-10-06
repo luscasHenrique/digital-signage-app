@@ -1,0 +1,197 @@
+.control {
+  cursor: text;
+}
+
+.multiple {
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-block: 5px;
+}
+
+.multiple .input {
+  min-width: 80px;
+  height: calc(var(--field-h) - 12px);
+}
+
+.input {
+  cursor: inherit;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 4px 0 10px;
+  border-radius: var(--lg-radius-full);
+  font-size: var(--lg-text-sm);
+  font-weight: var(--lg-weight-medium);
+  color: var(--lg-accent);
+  background: var(--lg-accent-soft);
+  animation: chipIn var(--lg-duration-base) var(--lg-ease-spring);
+  max-width: 100%;
+}
+
+.control[data-size="sm"] .chip {
+  height: 22px;
+  font-size: var(--lg-text-xs);
+}
+
+.chipRemove {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: inherit;
+  transition: background var(--lg-duration-fast) ease;
+}
+.chipRemove:hover {
+  background: color-mix(in srgb, var(--lg-accent) 20%, transparent);
+}
+
+.chevron > svg {
+  transition: transform var(--lg-duration-slow) var(--lg-ease-spring);
+}
+.chevron[data-open="true"] > svg {
+  transform: rotate(180deg);
+}
+.control[data-open="true"] .chevron {
+  color: var(--lg-accent);
+}
+
+/* ---------- Lista ---------- */
+.list {
+  position: fixed;
+  z-index: var(--lg-z-popover);
+  min-width: 200px;
+  max-height: min(320px, 50vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  border-radius: var(--lg-radius-lg);
+  font-family: var(--lg-font-sans);
+  color: var(--lg-text);
+  background: var(--lg-glass-bg-strong);
+  -webkit-backdrop-filter: var(--lg-glass-filter-strong);
+  backdrop-filter: var(--lg-glass-filter-strong);
+  box-shadow:
+    var(--lg-glass-shadow),
+    0 20px 40px -16px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+  transform-origin: top center;
+  transition:
+    opacity var(--lg-duration-fast) ease,
+    transform var(--lg-duration-base) var(--lg-ease-out);
+}
+.list[data-side="top"] {
+  transform-origin: bottom center;
+  transform: translateY(4px) scale(0.98);
+}
+.list[data-visible="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+.groupLabel {
+  padding: 8px 10px 4px;
+  font-size: 11px;
+  font-weight: var(--lg-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--lg-text-tertiary);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: var(--lg-radius-sm);
+  font-size: var(--lg-text-sm);
+  cursor: pointer;
+  user-select: none;
+}
+
+.option[data-active="true"] {
+  background: var(--lg-fill);
+}
+
+.option[aria-selected="true"] {
+  font-weight: var(--lg-weight-semibold);
+}
+
+.option[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.optionIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  flex-shrink: 0;
+  color: var(--lg-text-secondary);
+}
+.optionIcon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.optionText {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.optionDescription {
+  font-size: var(--lg-text-xs);
+  font-weight: var(--lg-weight-regular);
+  color: var(--lg-text-tertiary);
+}
+
+.optionCheck {
+  display: inline-flex;
+  color: var(--lg-accent);
+  opacity: 0;
+  transform: scale(0.5);
+  transition:
+    opacity var(--lg-duration-fast) ease,
+    transform var(--lg-duration-base) var(--lg-ease-spring);
+}
+.optionCheck[data-checked="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+.mark {
+  background: none;
+  color: var(--lg-accent);
+  font-weight: var(--lg-weight-semibold);
+}
+
+.create {
+  color: var(--lg-accent);
+}
+.create .optionIcon {
+  color: inherit;
+  font-size: 18px;
+  font-weight: var(--lg-weight-medium);
+}
+
+.empty {
+  padding: 18px 10px;
+  text-align: center;
+  font-size: var(--lg-text-sm);
+  color: var(--lg-text-tertiary);
+}
+
+@keyframes chipIn {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}

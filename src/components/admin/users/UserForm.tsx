@@ -1,36 +1,37 @@
 // src/components/admin/users/UserForm.tsx
 "use client";
 
-import { createUser, updateUser } from "@/actions/users";
-import { LoadingButton } from "@/components/ui/loading-button";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { UserWithProfile, UserRole } from "@/types";
+import { createUser, updateUser } from "@/actions/users";
+import { Button } from "@/components/ui/Button/Button";
+import { Select } from "@/components/ui/Select/Select";
+import { TextField } from "@/components/ui/TextField/TextField";
+import { useToast } from "@/components/ui/Toast/Toast";
+import { applyActionErrors } from "@/lib/form-errors";
 import { userFormSchema, type UserFormData } from "@/lib/schemas";
+import { UserRole, UserWithProfile } from "@/types";
 
 interface UserFormProps {
   initialData: UserWithProfile | null;
   onSuccess: () => void;
 }
 
+const roleOptions = [
+  {
+    value: UserRole.STANDARD,
+    label: "Padrão",
+    description: "Gerencia anúncios e empresas.",
+  },
+  {
+    value: UserRole.ADMIN,
+    label: "Administrador",
+    description: "Também gerencia usuários e vê a auditoria.",
+  },
+];
+
 export function UserForm({ initialData, onSuccess }: UserFormProps) {
+  const toast = useToast();
   const form = useForm<UserFormData>({
     resolver: zodResolver(userFormSchema),
     defaultValues: {
@@ -41,105 +42,94 @@ export function UserForm({ initialData, onSuccess }: UserFormProps) {
       role: initialData?.role || UserRole.STANDARD,
     },
   });
+  const { errors, isSubmitting } = form.formState;
 
   const onSubmit = async (data: UserFormData) => {
     const action = initialData ? updateUser : createUser;
     const result = await action(data);
 
     if (result.success) {
-      if (typeof result.message === "string") {
-        toast.success(result.message);
-      }
+      toast.success(result.message);
       onSuccess();
     } else {
-      if (result.message && typeof result.message === "object") {
-        Object.entries(result.message).forEach(([key, value]) => {
-          if (!value) return;
-          if (key === "_server") {
-            toast.error(value.join(", "));
-          } else {
-            form.setError(key as keyof UserFormData, {
-              message: value.join(", "),
-            });
-          }
-        });
-      }
+      applyActionErrors(result.message, form.setError, toast.error);
     }
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="full_name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nome Completo</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>E-mail</FormLabel>
-              <FormControl>
-                <Input type="email" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Senha</FormLabel>
-              <FormControl>
-                <Input
-                  type="password"
-                  placeholder={
-                    initialData ? "Deixe em branco para não alterar" : ""
-                  }
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="role"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Função</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value={UserRole.ADMIN}>Administrador</SelectItem>
-                  <SelectItem value={UserRole.STANDARD}>Padrão</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <LoadingButton type="submit" loading={form.formState.isSubmitting}>
-          {initialData ? "Salvar Alterações" : "Criar Usuário"}
-        </LoadingButton>
-      </form>
-    </Form>
+    <form
+      onSubmit={form.handleSubmit(onSubmit)}
+      className="flex flex-col gap-5"
+      noValidate
+    >
+      <Controller
+        control={form.control}
+        name="full_name"
+        render={({ field }) => (
+          <TextField
+            {...field}
+            label="Nome completo"
+            autoComplete="name"
+            required
+            error={errors.full_name?.message}
+          />
+        )}
+      />
+
+      <Controller
+        control={form.control}
+        name="email"
+        render={({ field }) => (
+          <TextField
+            {...field}
+            type="email"
+            label="E-mail"
+            autoComplete="email"
+            required
+            error={errors.email?.message}
+          />
+        )}
+      />
+
+      <Controller
+        control={form.control}
+        name="password"
+        render={({ field }) => (
+          <TextField
+            {...field}
+            value={field.value ?? ""}
+            type="password"
+            label="Senha"
+            autoComplete="new-password"
+            placeholder={
+              initialData ? "Deixe em branco para não alterar" : undefined
+            }
+            hint={initialData ? undefined : "Mínimo de 6 caracteres."}
+            required={!initialData}
+            error={errors.password?.message}
+          />
+        )}
+      />
+
+      <Controller
+        control={form.control}
+        name="role"
+        render={({ field }) => (
+          <Select
+            label="Função"
+            name={field.name}
+            options={roleOptions}
+            value={field.value}
+            onValueChange={(value) => value && field.onChange(value)}
+            error={errors.role?.message}
+            required
+          />
+        )}
+      />
+
+      <Button type="submit" fullWidth size="lg" loading={isSubmitting}>
+        {initialData ? "Salvar alterações" : "Criar usuário"}
+      </Button>
+    </form>
   );
 }

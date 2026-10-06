@@ -2,7 +2,7 @@
 
 Painel para gerenciar anúncios (imagens, vídeos e embeds do YouTube) e exibi-los em telas, com uma página de exibição por empresa. Essa página pode ser protegida por senha.
 
-Feito com Next.js 15, React 19, Supabase e Tailwind/shadcn.
+Feito com Next.js 15, React 19, Supabase e o design system [Liquid Glass](https://github.com/luscasHenrique/liquid-glass-ui).
 
 ## Começando
 

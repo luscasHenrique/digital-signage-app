@@ -1,142 +1,101 @@
 // src/components/admin/auditoria/AuditClient.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, Copy, Search } from "lucide-react";
-import type { AuditRow } from "@/types/audit";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  History,
+  Minus,
+  Pencil,
+  Plus,
+  RotateCcw,
+} from "lucide-react";
+import { PageHeader } from "@/components/admin/PageHeader";
+import {
+  Accordion,
+  type AccordionItem,
+} from "@/components/ui/Accordion/Accordion";
+import { Avatar } from "@/components/ui/Avatar/Avatar";
+import { Badge } from "@/components/ui/Badge/Badge";
+import { Button } from "@/components/ui/Button/Button";
+import { Card } from "@/components/ui/Card/Card";
+import { DatePicker } from "@/components/ui/DatePicker/DatePicker";
+import type { DateRange } from "@/components/ui/DatePicker/date-utils";
+import { Select } from "@/components/ui/Select/Select";
+import { TextField } from "@/components/ui/TextField/TextField";
+import { useToast } from "@/components/ui/Toast/Toast";
+import { endOfDay, startOfDay } from "@/lib/advertisement-display";
+import {
+  AUDIT_ACTION_LABEL,
+  AUDIT_TABLE_LABEL,
+  computeChanges,
+  entityLabel,
+  redactSecrets,
+  summarizeAudit,
+} from "@/lib/audit-format";
+import type { AuditAction, AuditRow } from "@/types/audit";
 
-/* ---------------- Helpers de formatação/local ---------------- */
+type Filters = {
+  q: string;
+  action: string;
+  table: string;
+  from: string;
+  to: string;
+};
 
-type JsonLike = Record<string, unknown> | null;
+const actionTone: Record<AuditAction, "success" | "accent" | "danger"> = {
+  INSERT: "success",
+  UPDATE: "accent",
+  DELETE: "danger",
+};
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return !!v && typeof v === "object" && !Array.isArray(v);
-}
+const actionIcon: Record<AuditAction, ReactNode> = {
+  INSERT: <Plus />,
+  UPDATE: <Pencil />,
+  DELETE: <Minus />,
+};
 
-function entityLabel(table: string): string {
-  switch (table) {
-    case "advertisements":
-      return "Anúncio";
-    case "advertisements_companies":
-      return "Vínculo Anúncio/Empresa";
-    case "companies":
-      return "Empresa";
-    case "profiles":
-      return "Perfil";
-    default:
-      return table;
-  }
-}
+// O Select trata "" como "sem valor"; "Todas" usa um valor próprio
+const ALL = "all";
 
-function humanVerb(action: AuditRow["action"]): string {
-  switch (action) {
-    case "INSERT":
-      return "Criou";
-    case "UPDATE":
-      return "Atualizou";
-    case "DELETE":
-      return "Excluiu";
-  }
-}
+const tableOptions = [
+  { value: ALL, label: "Todas as áreas" },
+  ...Object.entries(AUDIT_TABLE_LABEL).map(([value, label]) => ({
+    value,
+    label,
+  })),
+];
 
-function labelForField(key: string): string {
-  const map: Record<string, string> = {
-    title: "Título",
-    description: "Descrição",
-    status: "Status",
-    type: "Tipo",
-    content_url: "Conteúdo",
-    thumbnail_url: "Thumbnail",
-    start_date: "Início",
-    end_date: "Fim",
-    duration_seconds: "Duração (s)",
-    overlay_text: "Texto do overlay",
-    overlay_bg_color: "Cor do fundo",
-    overlay_text_color: "Cor do texto",
-    overlay_position: "Posição do overlay",
-    name: "Nome",
-    slug: "Slug",
-    is_private: "Privado",
-    email: "E-mail",
-    full_name: "Nome completo",
-    role: "Função",
+const actionOptions = [
+  { value: ALL, label: "Todas as ações" },
+  ...(Object.keys(AUDIT_ACTION_LABEL) as AuditAction[]).map((value) => ({
+    value,
+    label: AUDIT_ACTION_LABEL[value],
+  })),
+];
+
+const perPageOptions = [10, 20, 50, 100].map((n) => ({
+  value: String(n),
+  label: `${n} por página`,
+}));
+
+const whenFormat = new Intl.DateTimeFormat("pt-BR", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+function toRange(from: string, to: string): DateRange {
+  return {
+    from: from ? new Date(from) : null,
+    to: to ? new Date(to) : null,
   };
-  return map[key] ?? key;
 }
-
-function formatValue(v: unknown): string {
-  if (v === null || v === undefined) return "—";
-  if (typeof v === "boolean") return v ? "Sim" : "Não";
-  if (typeof v === "number") return String(v);
-  if (typeof v === "string") {
-    const maybeDate = Date.parse(v);
-    if (!Number.isNaN(maybeDate) && v.includes("T")) {
-      try {
-        return new Date(v).toLocaleString("pt-BR");
-      } catch {}
-    }
-    return v;
-  }
-  try {
-    return JSON.stringify(v);
-  } catch {
-    return String(v);
-  }
-}
-
-function extractTitle(
-  before_data: JsonLike,
-  after_data: JsonLike
-): string | null {
-  const candidates = [after_data, before_data];
-  for (const obj of candidates) {
-    if (isRecord(obj)) {
-      const t = obj.title ?? obj.name;
-      if (typeof t === "string" && t.trim()) return t;
-    }
-  }
-  return null;
-}
-
-type ChangeLine = { label: string; before: string; after: string };
-
-function computeChanges(
-  before_data: JsonLike,
-  after_data: JsonLike
-): ChangeLine[] {
-  const oldObj = isRecord(before_data) ? before_data : {};
-  const newObj = isRecord(after_data) ? after_data : {};
-
-  const ignore = new Set([
-    "created_at",
-    "updated_at",
-    "last_edited_by",
-    "created_by",
-  ]);
-  const keys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
-
-  const lines: ChangeLine[] = [];
-  for (const k of keys) {
-    if (ignore.has(k)) continue;
-    const a = (oldObj as Record<string, unknown>)[k];
-    const b = (newObj as Record<string, unknown>)[k];
-    if (JSON.stringify(a) !== JSON.stringify(b)) {
-      lines.push({
-        label: labelForField(k),
-        before: formatValue(a),
-        after: formatValue(b),
-      });
-    }
-  }
-  return lines;
-}
-
-/* ---------------- Componente ---------------- */
 
 export default function AuditClient({
   items,
@@ -149,425 +108,293 @@ export default function AuditClient({
   total: number;
   page: number;
   perPage: number;
-  initialFilters: {
-    q: string;
-    action: string;
-    table: string;
-    from: string;
-    to: string;
-  };
+  initialFilters: Filters;
 }) {
   const router = useRouter();
   const sp = useSearchParams();
-
-  const [q, setQ] = useState(initialFilters.q);
-  const [action, setAction] = useState(initialFilters.action);
-  const [table, setTable] = useState(initialFilters.table);
-  const [from, setFrom] = useState(initialFilters.from);
-  const [to, setTo] = useState(initialFilters.to);
+  const [filters, setFilters] = useState<Filters>(initialFilters);
 
   const totalPages = Math.max(1, Math.ceil(total / perPage));
   const showingFrom = total === 0 ? 0 : (page - 1) * perPage + 1;
   const showingTo = Math.min(total, page * perPage);
+  const hasFilters = Object.values(initialFilters).some(Boolean);
 
-  const applyFilters = (nextPage = 1) => {
+  const navigate = (changes: Record<string, string | number>) => {
     const params = new URLSearchParams(sp?.toString() || "");
-    params.set("page", String(nextPage));
     params.set("perPage", String(perPage));
-    const filters = { q, action, table, from, to };
-    for (const [key, value] of Object.entries(filters)) {
-      if (value) params.set(key, value);
-      else params.delete(key);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === "" || value === undefined) params.delete(key);
+      else params.set(key, String(value));
     }
     router.replace(`?${params.toString()}`);
+  };
+
+  const applyFilters = (next: Filters = filters) =>
+    navigate({ ...next, page: 1 });
+
+  const update = (patch: Partial<Filters>, apply = false) => {
+    const next = { ...filters, ...patch };
+    setFilters(next);
+    if (apply) applyFilters(next);
   };
 
   const clearFilters = () => {
-    setQ("");
-    setAction("");
-    setTable("");
-    setFrom("");
-    setTo("");
-    const params = new URLSearchParams();
-    params.set("page", "1");
-    params.set("perPage", String(perPage));
-    router.replace(`?${params.toString()}`);
+    const empty: Filters = { q: "", action: "", table: "", from: "", to: "" };
+    setFilters(empty);
+    applyFilters(empty);
   };
 
-  const changePerPage = (n: number) => {
-    const params = new URLSearchParams(sp?.toString() || "");
-    params.set("perPage", String(n));
-    params.set("page", "1"); // reset para a primeira página
-    router.replace(`?${params.toString()}`);
-  };
+  const accordionItems: AccordionItem[] = items.map((row) => ({
+    value: String(row.id),
+    icon: (
+      <span
+        className="grid size-8 place-items-center rounded-full [&_svg]:size-4"
+        style={{
+          background: `var(--lg-${actionTone[row.action]}-soft)`,
+          color: `var(--lg-${actionTone[row.action]})`,
+        }}
+      >
+        {actionIcon[row.action]}
+      </span>
+    ),
+    title: summarizeAudit(
+      row.action,
+      row.table_name,
+      row.before_data,
+      row.after_data
+    ),
+    subtitle: `${actorName(row)} · ${whenFormat.format(new Date(row.created_at))}`,
+    meta: (
+      <Badge tone={actionTone[row.action]}>{entityLabel(row.table_name)}</Badge>
+    ),
+    content: <AuditDetails row={row} />,
+  }));
 
   return (
-    <main className="p-6 space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-2xl font-semibold">Auditoria</h1>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+    <>
+      <PageHeader
+        title="Auditoria"
+        description="Histórico de tudo o que foi criado, alterado ou excluído."
+      />
+
+      <Card variant="strong" radius="lg" className="flex flex-col gap-4">
+        <form
+          className="grid gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.6fr)]"
+          onSubmit={(e) => {
+            e.preventDefault();
+            applyFilters();
+          }}
+        >
+          <TextField
+            type="search"
+            label="Buscar"
+            placeholder="E-mail, título, valores..."
+            value={filters.q}
+            onChange={(e) => update({ q: e.target.value })}
+            onClear={() => update({ q: "" }, true)}
+          />
+          <Select
+            label="Área"
+            options={tableOptions}
+            value={filters.table || ALL}
+            onValueChange={(value) =>
+              update({ table: value === ALL ? "" : (value ?? "") }, true)
+            }
+          />
+          <Select
+            label="Ação"
+            options={actionOptions}
+            value={filters.action || ALL}
+            onValueChange={(value) =>
+              update({ action: value === ALL ? "" : (value ?? "") }, true)
+            }
+          />
+          <DatePicker
+            mode="range"
+            label="Período"
+            placeholder="Qualquer data"
+            clearable
+            value={toRange(filters.from, filters.to)}
+            onValueChange={(range) => {
+              // Só aplica com o período completo (ou quando for limpo)
+              if (range.from && !range.to) return;
+              update(
+                {
+                  from: range.from ? startOfDay(range.from).toISOString() : "",
+                  to: range.to ? endOfDay(range.to).toISOString() : "",
+                },
+                true
+              );
+            }}
+          />
+          {/* Enter no campo de busca aplica os filtros */}
+          <button type="submit" hidden />
+        </form>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
           <span>
-            {total} registro{total === 1 ? "" : "s"} • página {page} de{" "}
-            {totalPages}
+            {total} registro{total === 1 ? "" : "s"}
+            {total > 0 && ` · exibindo ${showingFrom}–${showingTo}`}
           </span>
-          <span className="hidden md:inline-block">
-            • Exibindo {showingFrom}-{showingTo}
-          </span>
+          {hasFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<RotateCcw />}
+              onClick={clearFilters}
+            >
+              Limpar filtros
+            </Button>
+          )}
         </div>
-      </div>
-
-      {/* Filtros */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
-            <div className="md:col-span-2">
-              <label className="text-xs text-muted-foreground block mb-1">
-                Buscar
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="texto em tabela, email, dados…"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                />
-                <Button type="button" onClick={() => applyFilters(1)}>
-                  <Search className="h-4 w-4 mr-2" />
-                  Filtrar
-                </Button>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">
-                Tabela
-              </label>
-              <Input
-                placeholder="ex.: advertisements, profiles…"
-                value={table}
-                onChange={(e) => setTable(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">
-                Ação
-              </label>
-              <Input
-                placeholder="INSERT | UPDATE | DELETE"
-                value={action}
-                onChange={(e) => setAction(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">
-                De
-              </label>
-              <Input
-                type="datetime-local"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">
-                Até
-              </label>
-              <Input
-                type="datetime-local"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="mt-3 flex items-center gap-3 flex-wrap">
-            <Button variant="secondary" onClick={() => applyFilters(1)}>
-              Aplicar filtros
-            </Button>
-            <Button variant="ghost" onClick={clearFilters}>
-              Limpar
-            </Button>
-
-            {/* Itens por página */}
-            <div className="ml-auto flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">
-                Itens por página
-              </span>
-              <select
-                value={perPage}
-                onChange={(e) => changePerPage(parseInt(e.target.value, 10))}
-                className="h-9 rounded-md border bg-background px-2 text-sm"
-              >
-                {[10, 20, 50, 100].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </CardContent>
       </Card>
 
-      {/* Tabela */}
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              <th className="text-left px-3 py-2 w-[160px]">Quando</th>
-              <th className="text-left px-3 py-2 w-[280px]">Usuário</th>
-              <th className="text-left px-3 py-2">Resumo</th>
-              <th className="text-left px-3 py-2 w-[120px]">Ver</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((row) => (
-              <AuditRowView key={row.id} row={row} />
-            ))}
-            {items.length === 0 && (
-              <tr>
-                <td
-                  colSpan={4}
-                  className="text-center px-3 py-6 text-muted-foreground"
-                >
-                  Nenhum registro encontrado.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {accordionItems.length > 0 ? (
+        <Accordion
+          type="multiple"
+          variant="separated"
+          headingLevel={2}
+          items={accordionItems}
+        />
+      ) : (
+        <Card
+          variant="strong"
+          padding="lg"
+          className="flex flex-col items-center gap-3 text-center"
+        >
+          <span className="grid size-12 place-items-center rounded-full bg-accent-soft text-primary">
+            <History size={22} />
+          </span>
+          <p className="text-muted-foreground">Nenhum registro encontrado.</p>
+        </Card>
+      )}
 
-      {/* Paginação */}
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
-          Exibindo {showingFrom}-{showingTo} de {total}
-        </div>
+      <nav
+        aria-label="Paginação"
+        className="flex flex-wrap items-center justify-between gap-3"
+      >
+        <Select
+          size="sm"
+          aria-label="Itens por página"
+          options={perPageOptions}
+          value={String(perPage)}
+          onValueChange={(value) =>
+            value && navigate({ perPage: value, page: 1 })
+          }
+          containerClassName="w-40"
+        />
         <div className="flex items-center gap-2">
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
+            leftIcon={<ChevronLeft />}
             disabled={page <= 1}
-            onClick={() => {
-              const params = new URLSearchParams(sp?.toString() || "");
-              params.set("page", "1");
-              params.set("perPage", String(perPage));
-              router.replace(`?${params.toString()}`);
-            }}
+            onClick={() => navigate({ page: page - 1 })}
           >
-            Primeira
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => {
-              const prev = Math.max(1, page - 1);
-              const params = new URLSearchParams(sp?.toString() || "");
-              params.set("page", String(prev));
-              params.set("perPage", String(perPage));
-              router.replace(`?${params.toString()}`);
-            }}
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
             Anterior
           </Button>
-
+          <span className="px-1 text-sm text-muted-foreground">
+            Página {page} de {totalPages}
+          </span>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
+            rightIcon={<ChevronRight />}
             disabled={page >= totalPages}
-            onClick={() => {
-              const next = Math.min(totalPages, page + 1);
-              const params = new URLSearchParams(sp?.toString() || "");
-              params.set("page", String(next));
-              params.set("perPage", String(perPage));
-              router.replace(`?${params.toString()}`);
-            }}
+            onClick={() => navigate({ page: page + 1 })}
           >
             Próxima
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => {
-              const params = new URLSearchParams(sp?.toString() || "");
-              params.set("page", String(totalPages));
-              params.set("perPage", String(perPage));
-              router.replace(`?${params.toString()}`);
-            }}
-          >
-            Última
           </Button>
         </div>
-      </div>
-    </main>
+      </nav>
+    </>
   );
 }
 
-function AuditRowView({ row }: { row: AuditRow }) {
-  const [open, setOpen] = useState(false);
+function actorName(row: AuditRow): string {
+  return (
+    row.actor?.full_name?.trim() ||
+    row.user_email?.trim() ||
+    (row.user_id ? `Usuário ${row.user_id.slice(0, 8)}…` : "Sistema")
+  );
+}
 
-  const actorName =
-    (row.actor?.full_name && row.actor.full_name.trim()) ||
-    (row.user_email && row.user_email.trim()) ||
-    (row.user_id ? `Usuário ${row.user_id.slice(0, 8)}…` : "—");
-
-  const when = useMemo(() => {
-    try {
-      const d = new Date(row.created_at);
-      return d.toLocaleString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return row.created_at;
-    }
-  }, [row.created_at]);
-
-  const entity = entityLabel(row.table_name);
-  const verb = humanVerb(row.action);
-  const titleCandidate = extractTitle(row.before_data, row.after_data);
-  const title = titleCandidate
-    ? `${verb} ${entity} “${titleCandidate}”`
-    : `${verb} ${entity}`;
-
-  const chips: string[] = [entity];
-  if (row.action === "INSERT") chips.push("Novo");
-  if (row.action === "UPDATE") chips.push("Edição");
-  if (row.action === "DELETE") chips.push("Remoção");
-
+function AuditDetails({ row }: { row: AuditRow }) {
+  const toast = useToast();
   const changes =
     row.action === "UPDATE"
       ? computeChanges(row.before_data, row.after_data)
       : [];
 
-  const beforePretty = JSON.stringify(row.before_data ?? {}, null, 2);
-  const afterPretty = JSON.stringify(row.after_data ?? {}, null, 2);
+  const copy = async (text: string) => {
+    await navigator.clipboard.writeText(text);
+    toast.success("Copiado para a área de transferência.");
+  };
 
   return (
-    <>
-      <tr className="border-t">
-        <td className="px-3 py-2 align-top">{when}</td>
-        <td className="px-3 py-2 align-top">
-          <div className="flex items-center gap-2">
-            {row.actor?.avatar_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={row.actor.avatar_url}
-                alt={actorName}
-                className="h-6 w-6 rounded-full object-cover"
-              />
-            ) : (
-              <div className="h-6 w-6 rounded-full bg-muted grid place-items-center text-[10px]">
-                {actorName.slice(0, 1)}
-              </div>
-            )}
-            <div className="truncate leading-tight">
-              <div className="truncate">{actorName}</div>
-              {row.user_email && row.user_email !== actorName && (
-                <div className="text-xs text-muted-foreground truncate">
-                  {row.user_email}
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2 text-sm">
+        <Avatar
+          name={actorName(row)}
+          src={row.actor?.avatar_url ?? undefined}
+          size={24}
+        />
+        <span>{actorName(row)}</span>
+        {row.user_email && row.user_email !== actorName(row) && (
+          <span className="text-muted-foreground">({row.user_email})</span>
+        )}
+      </div>
+
+      {row.action === "UPDATE" &&
+        (changes.length > 0 ? (
+          <div className="overflow-hidden rounded-[var(--lg-radius-md)] border border-border">
+            {changes.map((ch) => (
+              <div
+                key={ch.key}
+                className="grid gap-1 border-t border-border p-3 text-sm first:border-t-0 md:grid-cols-[160px_1fr_1fr] md:gap-3"
+              >
+                <div className="font-semibold">{ch.label}</div>
+                <div className="break-all text-muted-foreground line-through">
+                  {ch.before}
                 </div>
-              )}
-            </div>
-          </div>
-        </td>
-        <td className="px-3 py-2 align-top">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">{row.action}</Badge>
-            {chips.map((c) => (
-              <Badge key={c} variant="secondary">
-                {c}
-              </Badge>
+                <div className="break-all">{ch.after}</div>
+              </div>
             ))}
           </div>
-          <div className="mt-1">{title}</div>
-          {row.action === "UPDATE" && (
-            <div className="text-xs text-muted-foreground">
-              {changes.length > 0
-                ? `${changes.length} alteração${changes.length > 1 ? "es" : ""}`
-                : "Sem alterações relevantes"}
-            </div>
-          )}
-        </td>
-        <td className="px-3 py-2 align-top">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setOpen((v) => !v)}
-          >
-            {open ? "Ocultar" : "Detalhes"}
-          </Button>
-        </td>
-      </tr>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Sem alterações relevantes.
+          </p>
+        ))}
 
-      {open && (
-        <tr className="border-t bg-muted/20">
-          <td colSpan={4} className="px-3 py-3">
-            {row.action === "UPDATE" && changes.length > 0 && (
-              <div className="mb-3 rounded-md border bg-background">
-                {changes.map((ch) => (
-                  <div
-                    key={`${row.id}-${ch.label}`}
-                    className="grid grid-cols-1 md:grid-cols-3 gap-2 p-3 border-t first:border-none"
-                  >
-                    <div className="text-sm font-medium">{ch.label}</div>
-                    <div className="text-sm text-muted-foreground line-through break-all">
-                      {ch.before}
-                    </div>
-                    <div className="text-sm break-all">{ch.after}</div>
-                  </div>
-                ))}
+      <div className="grid gap-3 md:grid-cols-2">
+        {(
+          [
+            ["Antes", row.before_data],
+            ["Depois", row.after_data],
+          ] as const
+        ).map(([label, data]) => {
+          const pretty = JSON.stringify(redactSecrets(data) ?? {}, null, 2);
+          return (
+            <div key={label} className="min-w-0">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-sm font-semibold">{label}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<Copy />}
+                  onClick={() => copy(pretty)}
+                >
+                  Copiar
+                </Button>
               </div>
-            )}
-
-            <div className="grid md:grid-cols-2 gap-3">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <div className="font-medium text-sm">Antes</div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigator.clipboard.writeText(beforePretty)}
-                  >
-                    <Copy className="h-4 w-4 mr-1" />
-                    Copiar
-                  </Button>
-                </div>
-                <pre className="text-xs bg-background p-3 rounded border overflow-x-auto">
-                  {beforePretty}
-                </pre>
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <div className="font-medium text-sm">Depois</div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigator.clipboard.writeText(afterPretty)}
-                  >
-                    <Copy className="h-4 w-4 mr-1" />
-                    Copiar
-                  </Button>
-                </div>
-                <pre className="text-xs bg-background p-3 rounded border overflow-x-auto">
-                  {afterPretty}
-                </pre>
-              </div>
+              <pre className="max-h-72 overflow-auto rounded-[var(--lg-radius-md)] bg-[var(--lg-code-bg)] p-3 font-mono text-xs">
+                {pretty}
+              </pre>
             </div>
-          </td>
-        </tr>
-      )}
-    </>
+          );
+        })}
+      </div>
+    </div>
   );
 }
