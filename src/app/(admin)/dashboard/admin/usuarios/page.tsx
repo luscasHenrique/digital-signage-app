@@ -1,37 +1,47 @@
+import type { User } from "@supabase/supabase-js";
+import { UsersClient } from "@/components/admin/users/UsersClient";
 import { requireAdminPage } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { UsersClient } from "@/components/admin/users/UsersClient";
+import { UserRole, UserWithProfile } from "@/types";
 
-// Esta função combina os dados de autenticação com os dados do perfil
-async function getUsersWithProfiles() {
-  const { data: authUsersResponse, error: authError } =
-    await supabaseAdmin.auth.admin.listUsers();
-  if (authError)
-    throw new Error(`Erro ao buscar usuários: ${authError.message}`);
+const PAGE_SIZE = 1000;
 
-  const { data: profiles, error: profilesError } = await supabaseAdmin
-    .from("profiles")
-    .select("*");
-  if (profilesError)
+/** listUsers é paginado (50 por padrão): percorre todas as páginas. */
+async function listAllAuthUsers(): Promise<User[]> {
+  const all: User[] = [];
+  for (let page = 1; ; page++) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+      page,
+      perPage: PAGE_SIZE,
+    });
+    if (error) throw new Error(`Erro ao buscar usuários: ${error.message}`);
+    all.push(...data.users);
+    if (data.users.length < PAGE_SIZE) return all;
+  }
+}
+
+async function getUsersWithProfiles(): Promise<UserWithProfile[]> {
+  const [authUsers, { data: profiles, error: profilesError }] =
+    await Promise.all([
+      listAllAuthUsers(),
+      supabaseAdmin.from("profiles").select("id, full_name, role"),
+    ]);
+  if (profilesError) {
     throw new Error(`Erro ao buscar perfis: ${profilesError.message}`);
-
-  // MELHORIA: Garante que os dados existem antes de continuar
-  if (!authUsersResponse || !profiles) {
-    throw new Error(
-      "Não foi possível carregar os dados completos dos usuários."
-    );
   }
 
-  const users = authUsersResponse.users.map((user) => {
-    const profile = profiles.find((p) => p.id === user.id); // 'as' removido para mais segurança de tipo
+  const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
+
+  return authUsers.map((user) => {
+    const profile = profileById.get(user.id);
     return {
-      ...user,
-      full_name: profile?.full_name,
-      role: profile?.role,
+      id: user.id,
+      email: user.email,
+      created_at: user.created_at,
+      full_name: profile?.full_name ?? undefined,
+      role: (profile?.role as UserRole | undefined) ?? undefined,
     };
   });
-
-  return users;
 }
 
 export default async function UsuariosPage() {

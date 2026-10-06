@@ -93,3 +93,24 @@ export function sanitizeAuditSearchTerm(value: string | undefined): string {
     .trim()
     .slice(0, 100);
 }
+
+/** Campos do JSON (antes/depois) em que a busca da auditoria procura. */
+const AUDIT_SEARCH_JSON_KEYS = ["title", "name", "full_name", "slug", "email"];
+
+/**
+ * Monta o filtro `.or()` da busca. O PostgREST não aceita `coluna::text` em
+ * filtros, então o JSON é pesquisado campo a campo com `->>`.
+ * `term` precisa vir de `sanitizeAuditSearchTerm`.
+ */
+export function buildAuditSearchFilter(term: string): string {
+  const like = `ilike.%${term}%`;
+  return [
+    `table_name.${like}`,
+    `user_email.${like}`,
+    `record_pk.${like}`,
+    ...AUDIT_SEARCH_JSON_KEYS.flatMap((key) => [
+      `after_data->>${key}.${like}`,
+      `before_data->>${key}.${like}`,
+    ]),
+  ].join(",");
+}

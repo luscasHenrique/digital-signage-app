@@ -3,42 +3,17 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence, Variants, Transition } from "framer-motion";
-import { Advertisement, AdvertisementType, OverlayPosition } from "@/types";
-import { createClient } from "@/lib/supabase/client";
-import { isOptimizableImage } from "@/lib/storage";
 import { getYoutubeEmbedUrl } from "@/lib/advertisement-display";
+import { isOptimizableImage } from "@/lib/storage";
+import { createClient } from "@/lib/supabase/client";
 import { ThemeScope } from "@/components/ui/Theme/ThemeScope";
+import { Advertisement, AdvertisementType, OverlayPosition } from "@/types";
+import { DisplayClock } from "./DisplayClock";
 import { FullscreenButton } from "./FullscreenButton";
+import { useIdle, useWakeLock } from "./hooks";
+import styles from "./CompanyDisplay.module.css";
 
-// ---- Animações ----
-const animationPresets: Record<string, Variants> = {
-  fade: {
-    initial: { opacity: 0 },
-    animate: { opacity: 1 },
-    exit: { opacity: 0 },
-  },
-  slideFromRight: {
-    initial: { x: "100%", opacity: 0 },
-    animate: { x: 0, opacity: 1 },
-    exit: { x: "-100%", opacity: 0 },
-  },
-  zoomIn: {
-    initial: { scale: 0.5, opacity: 0 },
-    animate: { scale: 1, opacity: 1 },
-    exit: { scale: 0.5, opacity: 0 },
-  },
-};
-
-const transitionSettings: Record<string, Transition> = {
-  fade: { duration: 1.5 },
-  slideFromRight: { duration: 1, ease: "easeInOut" },
-  zoomIn: { duration: 1 },
-};
-
-type AnimationType = keyof typeof animationPresets;
-
-const REFRESH_INTERVAL_MS = 30_000;
+type AnimationType = "fade" | "slideFromRight" | "zoomIn";
 
 interface CompanyDisplayProps {
   ads: Advertisement[];
@@ -47,54 +22,58 @@ interface CompanyDisplayProps {
   slug: string;
 }
 
+const REFRESH_INTERVAL_MS = 30_000;
+const DEFAULT_DURATION_SECONDS = 10;
+/** Tempo da animação de troca (precisa bater com o CSS). */
+const TRANSITION_MS = 1000;
+
 export function CompanyDisplay({
   ads,
   animationType = "fade",
   companyId,
   slug,
 }: CompanyDisplayProps) {
-  // Estado local com os anúncios atuais
   const [adList, setAdList] = useState<Advertisement[]>(ads);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [now, setNow] = useState(new Date());
-  const videoRef = useRef<HTMLVideoElement>(null);
-
+  // Slide que está saindo: fica na tela durante a animação de troca
+  const [leaving, setLeaving] = useState<Advertisement | null>(null);
   const supabase = useMemo(() => createClient(), []);
-  const selectedAnimation = animationPresets[animationType];
-  const selectedTransition = transitionSettings[animationType];
+  const idle = useIdle(3000);
+  useWakeLock();
 
-  // Se o server mandar novos `ads`, ressincroniza
+  // Se o servidor mandar novos `ads`, ressincroniza
   useEffect(() => {
     setAdList(ads);
     setCurrentIndex(0);
   }, [ads]);
 
-  // Relógio
-  useEffect(() => {
-    const clockTimer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(clockTimer);
-  }, []);
+  const currentAd = adList[currentIndex] as Advertisement | undefined;
+  const nextAd =
+    adList.length > 1 ? adList[(currentIndex + 1) % adList.length] : undefined;
 
-  // Slideshow
-  useEffect(() => {
+  const goNext = useCallback(() => {
     if (adList.length <= 1) return;
-    const duration = (adList[currentIndex]?.duration_seconds || 10) * 1000;
-    const slideshowTimer = setTimeout(() => {
-      setCurrentIndex((prev) => (prev + 1) % adList.length);
-    }, duration);
-    return () => clearTimeout(slideshowTimer);
-  }, [currentIndex, adList]);
-
-  // Garantir autoplay do vídeo atual
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current
-        .play()
-        .catch((error) => console.warn("Autoplay bloqueado:", error));
-    }
+    setLeaving(adList[currentIndex] ?? null);
+    setCurrentIndex((prev) => (prev + 1) % adList.length);
   }, [adList, currentIndex]);
 
-  // ---- Refetch (API do servidor valida o acesso) + Realtime ----
+  // Slideshow: cada anúncio fica pelo tempo configurado
+  useEffect(() => {
+    if (adList.length <= 1) return;
+    const seconds =
+      adList[currentIndex]?.duration_seconds || DEFAULT_DURATION_SECONDS;
+    const timer = setTimeout(goNext, seconds * 1000);
+    return () => clearTimeout(timer);
+  }, [adList, currentIndex, goNext]);
+
+  // Remove o slide anterior quando a animação termina
+  useEffect(() => {
+    if (!leaving) return;
+    const timer = setTimeout(() => setLeaving(null), TRANSITION_MS);
+    return () => clearTimeout(timer);
+  }, [leaving]);
+
+  // ---- Refetch (a API do servidor valida o acesso) + Realtime ----
   const refetch = useCallback(async () => {
     try {
       const res = await fetch(`/api/display/${encodeURIComponent(slug)}`, {
@@ -112,7 +91,7 @@ export function CompanyDisplay({
       }
 
       const { ads: list } = (await res.json()) as { ads: Advertisement[] };
-      setAdList(list);
+      setAdList((current) => (sameAds(current, list) ? current : list));
       setCurrentIndex((prev) => (list.length > 0 ? prev % list.length : 0));
     } catch (error) {
       // Falha de rede: mantém a lista atual na tela.
@@ -120,7 +99,7 @@ export function CompanyDisplay({
     }
   }, [slug]);
 
-  // Debounce para agrupar rajadas de eventos
+  // Agrupa rajadas de eventos do Realtime num único refetch
   const debouncedRefetch = useMemo(() => {
     let t: ReturnType<typeof setTimeout> | null = null;
     return () => {
@@ -145,9 +124,7 @@ export function CompanyDisplay({
           table: "display_signals",
           filter: `company_id=eq.${companyId}`,
         },
-        () => {
-          debouncedRefetch();
-        }
+        debouncedRefetch
       )
       .subscribe();
 
@@ -158,140 +135,173 @@ export function CompanyDisplay({
 
   // Refetch periódico: cobre a janela de datas (start/end) e falhas do Realtime.
   useEffect(() => {
-    const id = setInterval(() => {
-      refetch();
-    }, REFRESH_INTERVAL_MS);
+    const id = setInterval(refetch, REFRESH_INTERVAL_MS);
     return () => clearInterval(id);
   }, [refetch]);
-
-  // ---- Render ----
-  if (!adList.length) {
-    return (
-      <ThemeScope theme="dark">
-        <main className="grid h-dvh w-screen place-items-center bg-black text-[var(--lg-text-secondary)]">
-          Nenhum anúncio ativo no momento.
-        </main>
-      </ThemeScope>
-    );
-  }
-
-  const currentAd = adList[currentIndex];
-
-  const renderAdContent = () => {
-    if (!currentAd) {
-      return <div className="text-white">Carregando anúncio...</div>;
-    }
-
-    switch (currentAd.type) {
-      case AdvertisementType.IMAGE_UPLOAD:
-      case AdvertisementType.IMAGE_LINK:
-        return (
-          <Image
-            src={currentAd.content_url}
-            alt={currentAd.title}
-            fill
-            className="object-cover"
-            priority
-            unoptimized={!isOptimizableImage(currentAd.content_url)}
-          />
-        );
-
-      case AdvertisementType.VIDEO_UPLOAD:
-      case AdvertisementType.VIDEO_LINK:
-        return (
-          <video
-            ref={videoRef}
-            key={currentAd.id}
-            src={currentAd.content_url}
-            muted
-            autoPlay
-            loop
-            playsInline
-            className="w-full h-full object-cover"
-          />
-        );
-
-      case AdvertisementType.EMBED_LINK: {
-        const embedUrl = getYoutubeEmbedUrl(currentAd.content_url);
-        if (embedUrl) {
-          return (
-            <iframe
-              width="100%"
-              height="100%"
-              src={embedUrl}
-              title={currentAd.title}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
-          );
-        }
-        return (
-          <div className="text-white">Preview indisponível para este link.</div>
-        );
-      }
-
-      default:
-        return null;
-    }
-  };
 
   return (
     <ThemeScope theme="dark">
       <main
         id="fullscreen-display"
-        className="relative h-dvh w-screen overflow-hidden bg-black text-white"
+        className={styles.screen}
+        data-idle={idle || undefined}
       >
-        <AnimatePresence>
-          <motion.div
-            key={currentAd?.id}
-            className="absolute inset-0 z-0"
-            variants={selectedAnimation}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={selectedTransition}
-          >
-            {renderAdContent()}
-          </motion.div>
-        </AnimatePresence>
-
-        {currentAd?.overlay_text && (
-          <div
-            className={`absolute w-full p-4 text-center text-2xl font-bold z-10 ${
-              currentAd.overlay_position === OverlayPosition.TOP
-                ? "top-0"
-                : "bottom-0"
-            }`}
-            style={{
-              backgroundColor: currentAd.overlay_bg_color || "rgba(0,0,0,0.5)",
-              color: currentAd.overlay_text_color || "white",
-            }}
-          >
-            {currentAd.overlay_text}
-          </div>
+        {currentAd ? (
+          <>
+            {/* Mesma key (id) do slide que estava na tela: o React reaproveita o
+                elemento, e vídeo/iframe não recarregam durante a saída */}
+            {leaving && leaving.id !== currentAd.id && (
+              <Slide
+                key={leaving.id}
+                ad={leaving}
+                phase="exit"
+                animation={animationType}
+              />
+            )}
+            <Slide
+              key={currentAd.id}
+              ad={currentAd}
+              phase={leaving ? "enter" : "idle"}
+              animation={animationType}
+              onError={goNext}
+            />
+            {/* Carrega a próxima imagem antes da troca (evita tela preta) */}
+            {nextAd && isImage(nextAd) && nextAd.id !== currentAd.id && (
+              <div className={styles.preload} aria-hidden="true">
+                <AdImage ad={nextAd} />
+              </div>
+            )}
+          </>
+        ) : (
+          <p className={styles.empty}>Nenhum anúncio ativo no momento.</p>
         )}
 
-        <div className="absolute right-5 top-5 z-20">
-          {/* Vidro "strong": legível sobre qualquer imagem, clara ou escura */}
-          <div className="lg-glass-strong rounded-[var(--lg-radius-xl)] px-5 py-3 text-center">
-            <div className="text-4xl font-bold tabular-nums tracking-[var(--lg-tracking-tight)]">
-              {now.toLocaleTimeString("pt-BR", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </div>
-            <div className="text-sm text-[var(--lg-text-secondary)] first-letter:uppercase">
-              {now.toLocaleDateString("pt-BR", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-              })}
-            </div>
-          </div>
+        <div className={styles.clock}>
+          <DisplayClock />
         </div>
 
-        <FullscreenButton targetId="fullscreen-display" />
+        <FullscreenButton targetId="fullscreen-display" hidden={idle} />
       </main>
     </ThemeScope>
   );
+}
+
+function Slide({
+  ad,
+  phase,
+  animation,
+  onError,
+}: {
+  ad: Advertisement;
+  phase: "enter" | "exit" | "idle";
+  animation: AnimationType;
+  onError?: () => void;
+}) {
+  return (
+    <div
+      className={styles.slide}
+      data-phase={phase}
+      data-animation={animation}
+      aria-hidden={phase === "exit" || undefined}
+    >
+      <AdContent ad={ad} active={phase !== "exit"} onError={onError} />
+
+      {ad.overlay_text && (
+        <div
+          className={styles.overlay}
+          data-position={
+            ad.overlay_position === OverlayPosition.TOP ? "top" : "bottom"
+          }
+          style={{
+            backgroundColor: ad.overlay_bg_color || "rgba(0,0,0,0.5)",
+            color: ad.overlay_text_color || "white",
+          }}
+        >
+          {ad.overlay_text}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function isImage(ad: Advertisement) {
+  return (
+    ad.type === AdvertisementType.IMAGE_UPLOAD ||
+    ad.type === AdvertisementType.IMAGE_LINK
+  );
+}
+
+function AdImage({ ad, onError }: { ad: Advertisement; onError?: () => void }) {
+  return (
+    <Image
+      src={ad.content_url}
+      alt={ad.title}
+      fill
+      sizes="100vw"
+      className="object-cover"
+      priority
+      unoptimized={!isOptimizableImage(ad.content_url)}
+      onError={onError}
+    />
+  );
+}
+
+function AdContent({
+  ad,
+  active,
+  onError,
+}: {
+  ad: Advertisement;
+  active: boolean;
+  onError?: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Garante o autoplay (alguns navegadores de TV ignoram o atributo)
+  useEffect(() => {
+    if (active) {
+      videoRef.current
+        ?.play()
+        .catch((error) => console.warn("Autoplay bloqueado:", error));
+    }
+  }, [active]);
+
+  if (isImage(ad)) return <AdImage ad={ad} onError={onError} />;
+
+  if (
+    ad.type === AdvertisementType.VIDEO_UPLOAD ||
+    ad.type === AdvertisementType.VIDEO_LINK
+  ) {
+    return (
+      <video
+        ref={videoRef}
+        src={ad.content_url}
+        muted
+        autoPlay
+        loop
+        playsInline
+        className="size-full object-cover"
+        onError={onError}
+      />
+    );
+  }
+
+  const embedUrl = getYoutubeEmbedUrl(ad.content_url);
+  if (embedUrl) {
+    return (
+      <iframe
+        src={embedUrl}
+        title={ad.title}
+        className="size-full border-0"
+        allow="autoplay; encrypted-media; picture-in-picture"
+      />
+    );
+  }
+
+  return <p className={styles.empty}>Conteúdo indisponível para este link.</p>;
+}
+
+/** Evita reiniciar o slideshow quando o refetch traz exatamente os mesmos anúncios. */
+function sameAds(a: Advertisement[], b: Advertisement[]) {
+  return a.length === b.length && JSON.stringify(a) === JSON.stringify(b);
 }

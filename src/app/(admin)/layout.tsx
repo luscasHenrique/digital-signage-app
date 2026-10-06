@@ -2,38 +2,17 @@
 import { redirect } from "next/navigation";
 import { PropsWithChildren } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
-import { createClient } from "@/lib/supabase/server";
-import { UserRole } from "@/types";
+import { getPageAuthContext } from "@/lib/auth";
 
 export default async function DashboardLayout({ children }: PropsWithChildren) {
-  const supabase = createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return redirect("/login");
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, full_name")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) {
-    return redirect("/login?message=Erro ao carregar perfil de usuário.");
-  }
-
-  const userRole =
-    profile.role === UserRole.ADMIN ? UserRole.ADMIN : UserRole.STANDARD;
+  const ctx = await getPageAuthContext();
+  if (!ctx) redirect("/login");
 
   return (
     <AdminShell
-      userRole={userRole}
-      userName={profile.full_name || user.email || "Usuário"}
-      userEmail={user.email ?? ""}
+      userRole={ctx.role}
+      userName={ctx.fullName || ctx.user.email || "Usuário"}
+      userEmail={ctx.user.email ?? ""}
     >
       {children}
     </AdminShell>

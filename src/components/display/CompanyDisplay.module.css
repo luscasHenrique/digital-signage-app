@@ -1,0 +1,116 @@
+.screen {
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+}
+
+/* TVs: esconde o cursor quando o mouse fica parado */
+.screen[data-idle] {
+  cursor: none;
+}
+
+.slide {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  will-change: transform, opacity;
+}
+
+/* O slide que entra fica por cima do que sai */
+.slide[data-phase="enter"] {
+  z-index: 1;
+}
+
+.slide[data-phase="enter"][data-animation="fade"] {
+  animation: fade-in 1000ms ease both;
+}
+.slide[data-phase="exit"][data-animation="fade"] {
+  animation: fade-out 1000ms ease both;
+}
+
+.slide[data-phase="enter"][data-animation="slideFromRight"] {
+  animation: slide-in 1000ms var(--lg-ease-in-out) both;
+}
+.slide[data-phase="exit"][data-animation="slideFromRight"] {
+  animation: slide-out 1000ms var(--lg-ease-in-out) both;
+}
+
+.slide[data-phase="enter"][data-animation="zoomIn"] {
+  animation: zoom-in 1000ms var(--lg-ease-out) both;
+}
+.slide[data-phase="exit"][data-animation="zoomIn"] {
+  animation: fade-out 1000ms ease both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes slide-out {
+  to {
+    transform: translateX(-100%);
+  }
+}
+@keyframes zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide[data-phase] {
+    animation-duration: 1ms !important;
+  }
+}
+
+.overlay {
+  position: absolute;
+  inset-inline: 0;
+  z-index: 2;
+  padding: 1rem;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.overlay[data-position="top"] {
+  top: 0;
+}
+.overlay[data-position="bottom"] {
+  bottom: 0;
+}
+
+.preload {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.clock {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 20;
+}
+
+.empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--lg-text-secondary);
+}

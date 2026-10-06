@@ -40,7 +40,8 @@ export interface Profile {
   role: UserRole;
 }
 
-export type UserWithProfile = User &
+/** Usuário como aparece no painel: só os campos que a tela usa. */
+export type UserWithProfile = Pick<User, "id" | "email" | "created_at"> &
   Partial<Pick<Profile, "full_name" | "role">>;
 
 /* =========================
@@ -83,3 +84,8 @@ export interface Advertisement {
   updated_at: string;
   companies?: Company[];
 }
+
+/** Anúncio com as empresas vinculadas (resultado do join M:N). */
+export type AdvertisementWithCompanies = Advertisement & {
+  companies: Company[];
+};

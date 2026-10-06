@@ -53,7 +53,7 @@ import {
   Company,
   OverlayPosition,
 } from "@/types";
-import type { AdvertisementWithCompanies } from "./AdvertisementsClient";
+import type { AdvertisementWithCompanies } from "@/types";
 import { ColorField } from "./ColorField";
 import { useStorageUpload } from "./useStorageUpload";
 

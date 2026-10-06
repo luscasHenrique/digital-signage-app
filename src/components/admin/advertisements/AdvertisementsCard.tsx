@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/Badge/Badge";
 import { Card } from "@/components/ui/Card/Card";
 import { formatPeriod } from "@/lib/format";
 import { AdvertisementPreview } from "./AdvertisementPreview";
-import type { AdvertisementWithCompanies } from "./AdvertisementsClient";
+import type { AdvertisementWithCompanies } from "@/types";
 import { ScheduleBadge } from "./ScheduleBadge";
 
 interface AdvertisementsCardProps {

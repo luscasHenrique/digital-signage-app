@@ -21,7 +21,14 @@ interface HTMLElementWithFullscreen extends HTMLElement {
   webkitRequestFullscreen?: () => Promise<void>;
 }
 
-export function FullscreenButton({ targetId }: { targetId: string }) {
+export function FullscreenButton({
+  targetId,
+  hidden = false,
+}: {
+  targetId: string;
+  /** Esconde com fade (ex.: mouse parado), mas continua clicável ao reaparecer */
+  hidden?: boolean;
+}) {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Função para verificar o estado da tela cheia
@@ -82,13 +89,17 @@ export function FullscreenButton({ targetId }: { targetId: string }) {
     }
   };
 
-  // ✅ A mágica acontece aqui: o botão só é renderizado se NÃO estiver em tela cheia.
+  // Em tela cheia o botão some (sai com Esc)
   if (isFullscreen) {
     return null;
   }
 
   return (
-    <div className="fixed bottom-5 right-5 z-50">
+    <div
+      className={`fixed bottom-5 right-5 z-50 transition-opacity duration-500 ${
+        hidden ? "pointer-events-none opacity-0" : "opacity-100"
+      }`}
+    >
       <div className="lg-glass-strong rounded-full">
         <Button
           onClick={handleToggleFullscreen}

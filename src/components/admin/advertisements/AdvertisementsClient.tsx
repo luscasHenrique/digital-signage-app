@@ -31,16 +31,11 @@ import {
 } from "@/lib/advertisement-display";
 import { formatPeriod } from "@/lib/format";
 import { normalizeSearch } from "@/lib/search";
-import { Advertisement, Company } from "@/types";
+import { AdvertisementWithCompanies, Company } from "@/types";
 import { AdvertisementForm } from "./AdvertisementForm";
 import { AdvertisementPreview } from "./AdvertisementPreview";
 import { AdvertisementsCard } from "./AdvertisementsCard";
 import { ScheduleBadge } from "./ScheduleBadge";
-
-// Os dados vêm de uma query com JOIN, então 'companies' é sempre um array.
-export type AdvertisementWithCompanies = Advertisement & {
-  companies: Company[];
-};
 
 interface AdvertisementsClientProps {
   initialAdvertisements: AdvertisementWithCompanies[];

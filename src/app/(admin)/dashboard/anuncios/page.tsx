@@ -1,61 +1,30 @@
-import { createClient } from "@/lib/supabase/server";
+// src/app/(admin)/dashboard/anuncios/page.tsx
 import { AdvertisementsClient } from "@/components/admin/advertisements/AdvertisementsClient";
-import { Advertisement, COMPANY_PUBLIC_COLUMNS, Company } from "@/types";
+import {
+  getAdvertisementsWithCompanies,
+  getCompanies,
+} from "@/lib/advertisement-queries";
+import { createClient } from "@/lib/supabase/server";
 
-// 1. Definimos um tipo específico para o resultado da nossa query
-// Ele é um Anúncio, mas garantimos a forma da propriedade 'companies'
-type AdvertisementWithCompaniesQueryResult = Advertisement & {
-  companies: Pick<Company, "id" | "name">[] | null;
-};
+export const dynamic = "force-dynamic";
 
-// 2. Adicionamos um tipo de retorno para a função getData
-async function getData(): Promise<{
-  advertisements: AdvertisementWithCompaniesQueryResult[];
-  companies: Company[];
-}> {
+export default async function AnunciosPage() {
   const supabase = createClient();
 
-  const { data: advertisements, error: adError } = await supabase
-    .from("advertisements")
-    .select("*, companies(id, name)")
-    .order("created_at", { ascending: false });
-
-  // A query de companies agora busca todos os campos
-  const { data: companies, error: companyError } = await supabase
-    .from("companies")
-    .select(COMPANY_PUBLIC_COLUMNS)
-    .order("name");
-
-  if (adError || companyError) {
-    console.error(
-      "Erro ao buscar dados para a página de anúncios:",
-      adError || companyError
-    );
+  const [advertisements, companies] = await Promise.all([
+    getAdvertisementsWithCompanies(supabase),
+    getCompanies(supabase),
+  ]).catch((error) => {
+    console.error("Erro ao buscar dados para a página de anúncios:", error);
     throw new Error(
       "Não foi possível carregar os dados dos anúncios. Por favor, tente novamente mais tarde."
     );
-  }
-
-  return {
-    advertisements:
-      (advertisements as AdvertisementWithCompaniesQueryResult[]) || [],
-    companies: companies || [],
-  };
-}
-
-export default async function AnunciosPage() {
-  const { advertisements, companies } = await getData();
-
-  // 3. O .map() agora está totalmente tipado, sem precisar de 'any'
-  const typedAdvertisements = advertisements.map((ad) => ({
-    ...ad,
-    companies: ad.companies || [], // Garante que 'companies' seja sempre um array
-  }));
+  });
 
   return (
     <AdvertisementsClient
-      initialAdvertisements={typedAdvertisements}
-      companies={companies as Company[]}
+      initialAdvertisements={advertisements}
+      companies={companies}
     />
   );
 }

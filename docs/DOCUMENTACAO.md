@@ -24,10 +24,10 @@ Plataforma de **sinalização digital (digital signage)**. Usuários cadastram *
 
 | Camada | Tecnologia |
 |---|---|
-| Framework | Next.js **15.5.7** (App Router, Server Components, Server Actions, Route Handlers) |
+| Framework | Next.js **15.5.27** (App Router, Server Components, Server Actions, Route Handlers) |
 | UI | React 19.1, design system **Liquid Glass** (CSS Modules, sem dependências), Tailwind CSS 4 só para layout, lucide-react |
 | Formulários | react-hook-form + zod 4 |
-| Animações | framer-motion (transições do display) e as animações do próprio design system |
+| Animações | CSS puro (transições do display) e as animações do próprio design system |
 | Backend | Supabase (Postgres, Auth, Storage, Realtime) via `@supabase/ssr` e `@supabase/supabase-js` |
 | Segurança | `jose` (JWT HS256 do display privado), `node:crypto` scrypt (hash das senhas de empresa) |
 | Testes | Vitest |
@@ -221,7 +221,8 @@ Cada registro aparece num Accordion com um resumo ("Atualizou anúncio “X”")
 |---|---|
 | `tsc --noEmit` | ✅ sem erros |
 | `eslint src tests` | ✅ 0 erros, 0 warnings |
-| `npm test` | ✅ 68 testes em 14 arquivos |
+| `npm test` | ✅ 72 testes em 15 arquivos |
+| `npm audit --omit=dev` | ✅ 0 vulnerabilidades |
 | `npm run build` | ✅ (o aviso de Edge Runtime vem do supabase-js no middleware e já existia antes) |
 
 Os testes cobrem:
@@ -268,13 +269,21 @@ Teste com o servidor de produção, contra o Supabase real e sem alterar dados:
 | S10 | URLs `javascript:`/`data:` aceitas em anúncios (o `z.string().url()` do zod 4 aceita qualquer esquema) | ✅ Só `http(s)`, no formulário e na action |
 | B6 | Anúncio saía do ar à 00:00 do último dia | ✅ Fim gravado como 23:59:59.999 (vale para anúncios salvos a partir de agora) |
 | B7 | O formulário não permitia desativar um anúncio | ✅ Chave "Anúncio ativo" |
+| S11 | Next.js 15.5.7 com vulnerabilidades críticas (RCE, bypass de middleware, DoS) e PostCSS vulnerável | ✅ Next 15.5.27 e PostCSS 8.5.29 (override); `npm audit` zerado |
+| S12 | Limite de tentativas em memória não funciona na Vercel (cada requisição pode cair numa instância) | ✅ No código: limite no banco (`consume_rate_limit`) com reserva em memória. ⏳ Requer a migração `20261006120000` |
+| B8 | Busca da Auditoria sempre dava erro (PostgREST não aceita `::text` em filtros) | ✅ Busca campo a campo no JSON com `->>` |
+| B9 | Tela de Usuários mostrava só os 50 primeiros | ✅ Percorre todas as páginas do `listUsers` |
+| B10 | Middleware podia perder cookies de sessão divididos ao renovar o token | ✅ `getAll`/`setAll` e redirecionamentos preservam os cookies |
+| P1 | "Anúncios da empresa" baixava os anúncios de todas as empresas | ✅ Filtro no banco (join interno) |
+| P2 | Layout e página do painel repetiam as consultas de sessão/perfil | ✅ `getPageAuthContext` com `cache()` por requisição |
+| P3 | Tela da TV carregava framer-motion e re-renderizava tudo a cada segundo | ✅ Transições em CSS, relógio isolado (atualiza por minuto), pré-carrega a próxima imagem; 193 KB → 157 KB |
+| — | Tela da TV | ✅ Mantém a tela ligada (Wake Lock), esconde cursor e botão com o mouse parado, pula anúncio com mídia quebrada, página 404 própria |
 | B5 | Detalhes nas actions de usuário | ✅ Nome obrigatório (schema único) |
 | — | Manutenção | ✅ Removidos `"use server"` do middleware, `@supabase/auth-helpers-nextjs` e `audio-toggle-button`; schemas unificados; retorno `{ success, message }` nas actions de auth; warnings do lint zerados; README reescrito; testes adicionados |
 
 ### Pendências
-- A migração SQL foi aplicada em produção em 2026-10-06.
+- A migração `20261006000000` foi aplicada em produção em 2026-10-06. **Falta aplicar `20261006120000_rate_limit_and_indexes.sql`** (limite de tentativas persistente e índices). Sem ela o sistema funciona, mas o limite fica só na memória.
 - Conferir no Supabase se `audit_logs` só é legível por ADMIN (RLS).
-- O limite de tentativas fica na memória de cada instância. Em deploy com várias instâncias ou serverless, mover para Redis/Upstash ou para uma tabela.
 - O bucket continua público: qualquer pessoa com a URL exata de um arquivo consegue acessá-lo. Para privacidade total, usar bucket privado com URLs assinadas.
 - Os acessos a displays privados agora duram 30 dias, pensando em telas que ficam ligadas. Ajuste `DISPLAY_TOKEN_MAX_AGE_SECONDS` se precisar.
 - Ainda não existem testes de ponta a ponta (navegador) nem com usuário logado em um banco de teste.

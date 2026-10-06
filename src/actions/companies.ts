@@ -16,12 +16,11 @@ import {
   createDisplayToken,
   displayTokenCookieName,
 } from "@/lib/display-token";
-import { createRateLimiter } from "@/lib/rate-limit";
+import { createPersistentRateLimiter } from "@/lib/persistent-rate-limit";
 
 type FieldErrors = Record<string, string[] | undefined>;
 type FormActionResult =
-  | { success: true; message: string }
-  | { success: false; message: FieldErrors };
+  { success: true; message: string } | { success: false; message: FieldErrors };
 
 const NOT_AUTHENTICATED: FormActionResult = {
   success: false,
@@ -155,7 +154,7 @@ const verifyPasswordSchema = z.object({
 });
 
 // 5 tentativas a cada 15 minutos por IP + empresa
-const passwordAttempts = createRateLimiter({
+const passwordAttempts = createPersistentRateLimiter({
   limit: 5,
   windowMs: 15 * 60 * 1000,
 });
@@ -171,13 +170,14 @@ export async function verifyCompanyPassword(
   const { slug, password } = validation.data;
 
   const headerList = await headers();
+  // Na Vercel, x-real-ip / x-forwarded-for são definidos pela própria plataforma
   const ip =
-    headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     headerList.get("x-real-ip") ||
+    headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     "unknown";
-  const rateKey = `${ip}:${slug}`;
+  const rateKey = `display-password:${ip}:${slug}`;
 
-  const attempt = passwordAttempts.consume(rateKey);
+  const attempt = await passwordAttempts.consume(rateKey);
   if (!attempt.allowed) {
     const minutes = Math.ceil(attempt.retryAfterMs / 60000);
     return {
@@ -220,7 +220,7 @@ export async function verifyCompanyPassword(
       }
     }
 
-    passwordAttempts.reset(rateKey);
+    await passwordAttempts.reset(rateKey);
 
     const token = await createDisplayToken(
       slug,

@@ -7,6 +7,7 @@ import {
   AuditLogDB,
   AuditRow,
   SearchParamsAudit,
+  buildAuditSearchFilter,
   normalizeDetails,
   parsePageParam,
   sanitizeAuditSearchTerm,
@@ -45,15 +46,7 @@ export default async function Page({
   // O termo entra na sintaxe do filtro .or() do PostgREST: precisa ser sanitizado.
   const q = sanitizeAuditSearchTerm(sp.q);
   if (q) {
-    query = query.or(
-      [
-        `table_name.ilike.%${q}%`,
-        `user_email.ilike.%${q}%`,
-        `record_pk.ilike.%${q}%`,
-        `before_data::text.ilike.%${q}%`,
-        `after_data::text.ilike.%${q}%`,
-      ].join(",")
-    );
+    query = query.or(buildAuditSearchFilter(q));
   }
   if (sp.from) query = query.gte("created_at", sp.from);
   if (sp.to) query = query.lte("created_at", sp.to);

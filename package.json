@@ -13,10 +13,9 @@
     "@hookform/resolvers": "^5.2.1",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.57.4",
-    "framer-motion": "^12.23.13",
     "jose": "^6.1.0",
     "lucide-react": "^0.544.0",
-    "next": "15.5.7",
+    "next": "^15.5.27",
     "react": "19.1.0",
     "react-colorful": "^5.6.1",
     "react-dom": "19.1.0",
@@ -30,9 +29,14 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.5.3",
+    "eslint-config-next": "^15.5.27",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^3.2.7"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "^8.5.29"
+    }
   }
 }

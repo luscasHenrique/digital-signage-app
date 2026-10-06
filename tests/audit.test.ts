@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parsePageParam, sanitizeAuditSearchTerm } from "@/types/audit";
+import {
+  buildAuditSearchFilter,
+  parsePageParam,
+  sanitizeAuditSearchTerm,
+} from "@/types/audit";
 
 describe("sanitizeAuditSearchTerm (S9)", () => {
   it("remove caracteres que alteram o filtro .or() do PostgREST", () => {
@@ -25,5 +29,15 @@ describe("parsePageParam", () => {
     expect(parsePageParam("1", 20, 5, 100)).toBe(5);
     expect(parsePageParam("1000", 20, 5, 100)).toBe(100);
     expect(parsePageParam("30", 20, 5, 100)).toBe(30);
+  });
+});
+
+describe("buildAuditSearchFilter", () => {
+  it("não usa cast (::text), que o PostgREST rejeita em filtros", () => {
+    const filter = buildAuditSearchFilter("promo");
+    expect(filter).not.toContain("::");
+    expect(filter).toContain("table_name.ilike.%promo%");
+    expect(filter).toContain("after_data->>title.ilike.%promo%");
+    expect(filter).toContain("before_data->>name.ilike.%promo%");
   });
 });
