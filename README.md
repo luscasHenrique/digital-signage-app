@@ -55,3 +55,5 @@ O `supabase db reset` recria o banco local com os dados de `supabase/seed.sql`: 
 ## Documentação
 
 Arquitetura, rotas, permissões, modelo de dados e fluxos: [docs/DOCUMENTACAO.md](docs/DOCUMENTACAO.md).
+
+Configuração da Vercel e do Supabase (CRON_SECRET, links de e-mail, SMTP) e como funcionam as telas: [docs/guias/](docs/guias/README.md).
