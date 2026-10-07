@@ -3,6 +3,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAuthContext } from "@/lib/auth";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isHttpUrl } from "@/lib/schemas";
 import {
   ADVERTISEMENTS_BUCKET,
@@ -56,19 +57,48 @@ async function syncCompanyLinks(
   }
 }
 
-async function removeStorageFiles(
-  supabase: SupabaseClient,
-  urls: (string | null | undefined)[]
-) {
-  const paths = urls
-    .map((url) => extractStoragePathFromPublicUrl(url))
-    .filter((p): p is string => !!p);
-  if (paths.length === 0) return;
+/**
+ * Apaga do Storage os arquivos que nenhum anúncio usa mais.
+ * Usa a service role: a política do bucket só deixa o dono do arquivo apagar,
+ * e quem edita/exclui o anúncio pode não ser quem enviou a mídia.
+ * Só chame depois de validar a sessão do usuário.
+ */
+async function removeStorageFiles(urls: (string | null | undefined)[]) {
+  const candidates = Array.from(
+    new Set(urls.filter((url): url is string => !!url))
+  ).filter((url) => !!extractStoragePathFromPublicUrl(url));
+  if (candidates.length === 0) return;
 
-  const { error } = await supabase.storage
-    .from(ADVERTISEMENTS_BUCKET)
-    .remove(paths);
-  if (error) console.warn("Falha ao limpar arquivos do Storage:", error);
+  try {
+    const [asContent, asThumbnail] = await Promise.all([
+      supabaseAdmin
+        .from("advertisements")
+        .select("content_url")
+        .in("content_url", candidates),
+      supabaseAdmin
+        .from("advertisements")
+        .select("thumbnail_url")
+        .in("thumbnail_url", candidates),
+    ]);
+    if (asContent.error) throw asContent.error;
+    if (asThumbnail.error) throw asThumbnail.error;
+
+    const used = new Set<string>([
+      ...(asContent.data ?? []).map((ad) => ad.content_url as string),
+      ...(asThumbnail.data ?? []).map((ad) => ad.thumbnail_url as string),
+    ]);
+    const paths = candidates
+      .filter((url) => !used.has(url))
+      .map((url) => extractStoragePathFromPublicUrl(url) as string);
+    if (paths.length === 0) return;
+
+    const { error } = await supabaseAdmin.storage
+      .from(ADVERTISEMENTS_BUCKET)
+      .remove(paths);
+    if (error) throw error;
+  } catch (error) {
+    console.warn("Falha ao limpar arquivos do Storage:", error);
+  }
 }
 
 // ESQUEMA DO SERVIDOR (ACTION SCHEMA)
@@ -227,7 +257,7 @@ export async function updateAdvertisement(data: ActionInput) {
     await syncCompanyLinks(supabase, id, company_ids);
 
     // Best-effort: remove arquivos antigos que foram trocados
-    await removeStorageFiles(supabase, [
+    await removeStorageFiles([
       oldAd?.content_url !== adData.content_url ? oldAd?.content_url : null,
       oldAd?.thumbnail_url !== adData.thumbnail_url
         ? oldAd?.thumbnail_url
@@ -270,7 +300,7 @@ export async function deleteAdvertisement(adId: string) {
     if (delDbErr) throw delDbErr;
 
     // Best-effort: remover arquivos do bucket
-    await removeStorageFiles(supabase, [ad?.content_url, ad?.thumbnail_url]);
+    await removeStorageFiles([ad?.content_url, ad?.thumbnail_url]);
 
     // Lista geral, anúncios por empresa e contadores do dashboard
     revalidatePath("/dashboard", "layout");
@@ -339,34 +369,8 @@ export async function discardUploads(urls: string[]) {
     );
   if (paths.length === 0) return { success: true, message: "Nada a remover." };
 
-  try {
-    const urlList = paths.map((p) => p.url);
-    const [asContent, asThumbnail] = await Promise.all([
-      ctx.supabase
-        .from("advertisements")
-        .select("content_url")
-        .in("content_url", urlList),
-      ctx.supabase
-        .from("advertisements")
-        .select("thumbnail_url")
-        .in("thumbnail_url", urlList),
-    ]);
-    if (asContent.error) throw asContent.error;
-    if (asThumbnail.error) throw asThumbnail.error;
-
-    const used = new Set<string>([
-      ...(asContent.data ?? []).map((ad) => ad.content_url as string),
-      ...(asThumbnail.data ?? []).map((ad) => ad.thumbnail_url as string),
-    ]);
-    await removeStorageFiles(
-      ctx.supabase,
-      paths.filter((p) => !used.has(p.url)).map((p) => p.url)
-    );
-    return { success: true, message: "Arquivos removidos." };
-  } catch (error) {
-    console.warn("Falha ao descartar uploads:", error);
-    return { success: false, message: "Falha ao descartar arquivos." };
-  }
+  await removeStorageFiles(paths.map((p) => p.url));
+  return { success: true, message: "Arquivos removidos." };
 }
 
 function errorMessage(error: unknown, fallback = "Erro desconhecido."): string {
