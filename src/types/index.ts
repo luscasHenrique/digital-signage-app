@@ -53,11 +53,22 @@ export interface Company {
   name: string;
   slug: string;
   is_private: boolean;
+  /** Animação de troca entre anúncios no display */
+  transition: DisplayTransition;
   created_at: string;
 }
 
+export const DISPLAY_TRANSITIONS = ["fade", "slideFromRight", "zoomIn"] as const;
+export type DisplayTransition = (typeof DISPLAY_TRANSITIONS)[number];
+
+/** Empresa com o último contato do display (status da TV no painel). */
+export type CompanyWithStatus = Company & {
+  heartbeat: { last_seen_at: string } | null;
+};
+
 /** Colunas de `companies` que podem ir para o navegador (nunca inclui `password`). */
-export const COMPANY_PUBLIC_COLUMNS = "id, name, slug, is_private, created_at";
+export const COMPANY_PUBLIC_COLUMNS =
+  "id, name, slug, is_private, transition, created_at";
 
 /* =========================
    ANÚNCIOS
@@ -82,12 +93,19 @@ export interface Advertisement {
   last_edited_by?: string;
   created_at: string;
   updated_at: string;
+  /** Ordem no display (menor primeiro; empate = mais recente primeiro) */
+  position: number;
+  /** 0 = domingo ... 6 = sábado; null = todos os dias */
+  weekdays?: number[] | null;
+  /** Faixa diária "HH:MM:SS" no horário de Brasília; null = o dia todo */
+  daily_start?: string | null;
+  daily_end?: string | null;
   companies?: Company[];
 }
 
 /** Colunas que o player do display usa (evita trafegar o anúncio inteiro). */
 export const DISPLAY_AD_COLUMNS =
-  "id, title, type, content_url, duration_seconds, overlay_text, overlay_position, overlay_bg_color, overlay_text_color";
+  "id, title, type, content_url, duration_seconds, overlay_text, overlay_position, overlay_bg_color, overlay_text_color, start_date, end_date, weekdays, daily_start, daily_end";
 
 export type DisplayAd = Pick<
   Advertisement,
@@ -100,6 +118,13 @@ export type DisplayAd = Pick<
   | "overlay_position"
   | "overlay_bg_color"
   | "overlay_text_color"
+  // O player também confere período e programação: a lista pode ficar em
+  // cache (offline) ou passar da hora entre uma atualização e outra
+  | "start_date"
+  | "end_date"
+  | "weekdays"
+  | "daily_start"
+  | "daily_end"
 >;
 
 /** Anúncio com as empresas vinculadas (resultado do join M:N). */

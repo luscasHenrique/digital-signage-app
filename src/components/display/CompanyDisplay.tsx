@@ -4,6 +4,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getYoutubeEmbedUrl } from "@/lib/advertisement-display";
+import { isPlayableNow } from "@/lib/ad-weekly-schedule";
 import { isOptimizableImage } from "@/lib/storage";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeScope } from "@/components/ui/Theme/ThemeScope";
@@ -29,6 +30,8 @@ const MAX_REFRESH_INTERVAL_MS = 5 * 60_000;
 const MEDIA_RETRY_MS = 60_000;
 /** Limite para vídeos longos (ou que nunca disparam `ended`). */
 const MAX_VIDEO_MS = 5 * 60_000;
+/** De quanto em quanto tempo confere a programação (dias/horários). */
+const SCHEDULE_TICK_MS = 30_000;
 const DEFAULT_DURATION_SECONDS = 10;
 /** Tempo da animação de troca (precisa bater com o CSS). */
 const TRANSITION_MS = 1000;
@@ -39,7 +42,10 @@ export function CompanyDisplay({
   companyId,
   slug,
 }: CompanyDisplayProps) {
-  const [adList, setAdList] = useState<DisplayAd[]>(ads);
+  // Lista vinda do servidor; a playlist é o que pode passar agora
+  const [allAds, setAllAds] = useState<DisplayAd[]>(ads);
+  const [clock, setClock] = useState(() => Date.now());
+  const adList = usePlaylist(allAds, clock);
   const [currentIndex, setCurrentIndex] = useState(0);
   // Slide que está saindo: fica na tela durante a animação de troca
   const [leaving, setLeaving] = useState<DisplayAd | null>(null);
@@ -55,9 +61,22 @@ export function CompanyDisplay({
 
   // Se o servidor mandar novos `ads`, ressincroniza
   useEffect(() => {
-    setAdList(ads);
+    setAllAds(ads);
     setCurrentIndex(0);
   }, [ads]);
+
+  // Programação semanal: a playlist muda sozinha ao entrar/sair do horário
+  useEffect(() => {
+    const id = setInterval(() => setClock(Date.now()), SCHEDULE_TICK_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  // A playlist encolheu: volta ao início
+  useEffect(() => {
+    if (currentIndex >= adList.length && currentIndex !== 0) {
+      setCurrentIndex(0);
+    }
+  }, [adList.length, currentIndex]);
 
   useEffect(() => setFailed(false), [adList]);
 
@@ -148,8 +167,7 @@ export function CompanyDisplay({
 
       etagRef.current = res.headers.get("ETag");
       const { ads: list } = (await res.json()) as { ads: DisplayAd[] };
-      setAdList((current) => (sameAds(current, list) ? current : list));
-      setCurrentIndex((prev) => (list.length > 0 ? prev % list.length : 0));
+      setAllAds((current) => (sameAds(current, list) ? current : list));
       return true;
     } catch (error) {
       // Falha de rede: mantém a lista atual na tela.
@@ -411,6 +429,23 @@ function AdContent({
   }
 
   return <p className={styles.empty}>Conteúdo indisponível para este link.</p>;
+}
+
+/**
+ * Anúncios que podem passar agora (período + dias/horários). Mantém a mesma
+ * referência enquanto o conteúdo não muda, para não reiniciar o slideshow.
+ */
+function usePlaylist(ads: DisplayAd[], clock: number): DisplayAd[] {
+  const previous = useRef<DisplayAd[]>([]);
+  return useMemo(() => {
+    const now = new Date(clock);
+    const next = ads.filter((ad) => isPlayableNow(ad, now));
+    const same =
+      next.length === previous.current.length &&
+      next.every((ad, i) => ad === previous.current[i]);
+    if (!same) previous.current = next;
+    return previous.current;
+  }, [ads, clock]);
 }
 
 /** Evita reiniciar o slideshow quando o refetch traz exatamente os mesmos anúncios. */

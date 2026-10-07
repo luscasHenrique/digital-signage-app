@@ -1,5 +1,5 @@
 // src/app/display/[slug]/page.tsx
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { CompanyDisplay } from "@/components/display/CompanyDisplay";
 import { DisplayError } from "@/components/display/DisplayError";
@@ -7,6 +7,7 @@ import {
   getActiveAdsForCompany,
   getDisplayCompany,
   hasDisplayAccess,
+  recordDisplayHeartbeat,
 } from "@/lib/display";
 import { displayTokenCookieName } from "@/lib/display-token";
 
@@ -32,7 +33,13 @@ export default async function DisplayPage({ params }: DisplayPageProps) {
 
   let ads;
   try {
-    ads = await getActiveAdsForCompany(company.id);
+    [ads] = await Promise.all([
+      getActiveAdsForCompany(company.id),
+      recordDisplayHeartbeat(
+        company.id,
+        (await headers()).get("user-agent")
+      ),
+    ]);
   } catch (error) {
     console.error("Erro ao buscar anúncios:", error);
     return <DisplayError />;
@@ -44,7 +51,7 @@ export default async function DisplayPage({ params }: DisplayPageProps) {
       ads={ads}
       companyId={company.id}
       slug={company.slug}
-      animationType="slideFromRight"
+      animationType={company.transition}
     />
   );
 }

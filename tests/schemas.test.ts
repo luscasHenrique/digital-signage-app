@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   advertisementFormSchema,
   companySchema,
+  normalizeWeeklySchedule,
   userFormSchema,
 } from "@/lib/schemas";
 import {
@@ -11,7 +12,7 @@ import {
   UserRole,
 } from "@/types";
 
-const base = { name: "Empresa X", slug: "empresa-x" };
+const base = { name: "Empresa X", slug: "empresa-x", transition: "fade" };
 
 describe("companySchema", () => {
   it("exige senha ao criar empresa privada", () => {
@@ -126,5 +127,46 @@ describe("advertisementFormSchema", () => {
     expect(
       errorsOf({ ...valid, thumbnail_url: "não é url" }).thumbnail_url
     ).toBeDefined();
+  });
+});
+
+describe("programação semanal", () => {
+  const ad = {
+    title: "Promo",
+    type: AdvertisementType.IMAGE_LINK,
+    content_url: "https://exemplo.com/a.png",
+    start_date: new Date("2026-10-01"),
+    end_date: new Date("2026-10-31"),
+    duration_seconds: "10",
+    status: AdvertisementStatus.ACTIVE,
+    company_ids: ["c1"],
+  };
+  const errorsOf = (extra: object) => {
+    const r = advertisementFormSchema.safeParse({ ...ad, ...extra });
+    return r.success ? {} : r.error.flatten().fieldErrors;
+  };
+
+  it("aceita sem restrição e com faixa completa", () => {
+    expect(errorsOf({})).toEqual({});
+    expect(errorsOf({ weekdays: [1, 2], daily_start: "11:00", daily_end: "14:00" })).toEqual({});
+  });
+
+  it("exige ao menos um dia e as duas pontas do horário", () => {
+    expect(errorsOf({ weekdays: [] })).toHaveProperty("weekdays");
+    expect(errorsOf({ daily_start: "11:00" })).toHaveProperty("daily_end");
+    expect(errorsOf({ daily_end: "11:00" })).toHaveProperty("daily_start");
+    expect(errorsOf({ daily_start: "11:00", daily_end: "11:00" })).toHaveProperty("daily_end");
+    expect(errorsOf({ daily_start: "25:00", daily_end: "11:00" })).toHaveProperty("daily_start");
+  });
+
+  it("normaliza para o banco: todos os dias e horários vazios viram null", () => {
+    expect(
+      normalizeWeeklySchedule({ weekdays: [0, 1, 2, 3, 4, 5, 6], daily_start: "", daily_end: "" })
+    ).toEqual({ weekdays: null, daily_start: null, daily_end: null });
+    expect(normalizeWeeklySchedule({ weekdays: [5, 1, 5] })).toEqual({
+      weekdays: [1, 5],
+      daily_start: null,
+      daily_end: null,
+    });
   });
 });

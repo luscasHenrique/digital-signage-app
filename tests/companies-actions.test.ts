@@ -53,7 +53,11 @@ function useAdminClient(results: Parameters<typeof fakeClient>[0] = {}) {
   return fake;
 }
 
-const company = { name: "Empresa X", slug: "empresa-x" };
+const company = {
+  name: "Empresa X",
+  slug: "empresa-x",
+  transition: "fade" as const,
+};
 
 describe("createCompany / updateCompany", () => {
   beforeEach(() => vi.clearAllMocks());

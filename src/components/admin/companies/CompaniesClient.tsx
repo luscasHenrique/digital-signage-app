@@ -1,7 +1,7 @@
 // src/components/admin/companies/CompaniesClient.tsx
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   ExternalLink,
@@ -23,12 +23,17 @@ import { Table, type TableColumn } from "@/components/ui/Table/Table";
 import { TextField } from "@/components/ui/TextField/TextField";
 import { useToast } from "@/components/ui/Toast/Toast";
 import { normalizeSearch } from "@/lib/search";
-import { Company } from "@/types";
+import { Company, type CompanyWithStatus } from "@/types";
+import { getDisplayStatus } from "@/lib/display-status";
+import { DisplayStatusBadge } from "./DisplayStatusBadge";
 import { CompanyForm } from "./CompanyForm";
 
 interface CompaniesClientProps {
-  companies: Company[];
+  companies: CompanyWithStatus[];
 }
+
+/** Atualiza o status das TVs enquanto a página está aberta. */
+const STATUS_REFRESH_MS = 60_000;
 
 export function CompaniesClient({ companies }: CompaniesClientProps) {
   const router = useRouter();
@@ -64,7 +69,20 @@ export function CompaniesClient({ companies }: CompaniesClientProps) {
     });
   };
 
-  const columns: TableColumn<Company>[] = [
+  // Hora de referência do status; renovada junto com os dados do servidor
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      router.refresh();
+      setNow(Date.now());
+    }, STATUS_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [router]);
+
+  const statusOrder = { online: 0, offline: 1, never: 2 };
+
+  const columns: TableColumn<CompanyWithStatus>[] = [
     {
       key: "name",
       header: "Empresa",
@@ -81,6 +99,16 @@ export function CompaniesClient({ companies }: CompaniesClientProps) {
         </code>
       ),
       hideOnMobile: true,
+    },
+    {
+      key: "status",
+      header: "Tela",
+      sortable: true,
+      sortValue: (c) =>
+        statusOrder[getDisplayStatus(c.heartbeat?.last_seen_at, now)],
+      cell: (c) => (
+        <DisplayStatusBadge lastSeenAt={c.heartbeat?.last_seen_at} now={now} />
+      ),
     },
     {
       key: "is_private",

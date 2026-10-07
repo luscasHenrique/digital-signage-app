@@ -5,6 +5,7 @@ import {
   getActiveAdsForCompany,
   getDisplayCompany,
   hasDisplayAccess,
+  recordDisplayHeartbeat,
 } from "@/lib/display";
 import { displayTokenCookieName } from "@/lib/display-token";
 
@@ -28,7 +29,10 @@ export async function GET(
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const ads = await getActiveAdsForCompany(company.id);
+    const [ads] = await Promise.all([
+      getActiveAdsForCompany(company.id),
+      recordDisplayHeartbeat(company.id, request.headers.get("user-agent")),
+    ]);
     const body = JSON.stringify({ ads });
     // O player consulta a cada 30 s; se nada mudou, responde 304 sem corpo.
     const etag = `"${createHash("sha1").update(body).digest("base64url")}"`;

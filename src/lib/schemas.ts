@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   AdvertisementStatus,
   AdvertisementType,
+  DISPLAY_TRANSITIONS,
   OverlayPosition,
   UserRole,
 } from "@/types";
@@ -16,6 +17,54 @@ export function isHttpUrl(value: string | null | undefined): boolean {
   } catch {
     return false;
   }
+}
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Campos da programação semanal (mesmos no formulário e na action). */
+export const weeklyScheduleFields = {
+  /** Dias marcados (0 = domingo). Vazio ou todos = sem restrição. */
+  weekdays: z.array(z.number().int().min(0).max(6)).nullable().optional(),
+  /** "HH:MM"; vazio = o dia todo */
+  daily_start: z.string().nullable().optional(),
+  daily_end: z.string().nullable().optional(),
+};
+
+type WeeklyScheduleInput = {
+  weekdays?: number[] | null;
+  daily_start?: string | null;
+  daily_end?: string | null;
+};
+
+export function validateWeeklySchedule(
+  data: WeeklyScheduleInput,
+  issue: (path: string, message: string) => void
+) {
+  if (data.weekdays && data.weekdays.length === 0) {
+    issue("weekdays", "Escolha ao menos um dia.");
+  }
+  const start = data.daily_start || "";
+  const end = data.daily_end || "";
+  if (start && !HHMM.test(start)) issue("daily_start", "Horário inválido.");
+  if (end && !HHMM.test(end)) issue("daily_end", "Horário inválido.");
+  if (!!start !== !!end) {
+    issue(start ? "daily_end" : "daily_start", "Informe o início e o fim.");
+  } else if (start && start === end) {
+    issue("daily_end", "O fim deve ser diferente do início.");
+  }
+}
+
+/** Formato gravado no banco: sem restrição vira null. */
+export function normalizeWeeklySchedule(data: WeeklyScheduleInput) {
+  const weekdays =
+    data.weekdays && data.weekdays.length > 0 && data.weekdays.length < 7
+      ? Array.from(new Set(data.weekdays)).sort()
+      : null;
+  return {
+    weekdays,
+    daily_start: data.daily_start || null,
+    daily_end: data.daily_end || null,
+  };
 }
 
 export const advertisementFormSchema = z
@@ -49,10 +98,14 @@ export const advertisementFormSchema = z
     overlay_position: z.nativeEnum(OverlayPosition).optional(),
     overlay_bg_color: z.string().optional(),
     overlay_text_color: z.string().optional(),
+
+    ...weeklyScheduleFields,
   })
   .superRefine((data, ctx) => {
     const issue = (path: string, message: string) =>
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+
+    validateWeeklySchedule(data, issue);
 
     if (!data.type) issue("type", "O tipo de anúncio é obrigatório.");
     if (!data.start_date) issue("start_date", "A data inicial é obrigatória.");
@@ -99,6 +152,7 @@ export const companySchema = z
         "O slug deve conter apenas letras minúsculas, números e hifens."
       ),
     is_private: z.boolean(),
+    transition: z.enum(DISPLAY_TRANSITIONS),
     // Em edição, vazio significa "manter a senha atual".
     password: z
       .string()

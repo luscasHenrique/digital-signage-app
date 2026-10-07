@@ -5,17 +5,36 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createCompany, updateCompany } from "@/actions/companies";
 import { Button } from "@/components/ui/Button/Button";
+import { Select } from "@/components/ui/Select/Select";
 import { Switch } from "@/components/ui/Switch/Switch";
 import { TextField } from "@/components/ui/TextField/TextField";
 import { useToast } from "@/components/ui/Toast/Toast";
 import { applyActionErrors } from "@/lib/form-errors";
 import { companySchema, type CompanyFormData } from "@/lib/schemas";
-import { Company } from "@/types";
+import { Company, type DisplayTransition } from "@/types";
 
 interface CompanyFormProps {
   initialData: Company | null;
   onSuccess: () => void;
 }
+
+const transitionOptions: {
+  value: DisplayTransition;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "slideFromRight",
+    label: "Deslizar",
+    description: "O próximo anúncio entra pela direita.",
+  },
+  { value: "fade", label: "Esmaecer", description: "Troca suave por opacidade." },
+  {
+    value: "zoomIn",
+    label: "Aproximar",
+    description: "O próximo anúncio cresce até ocupar a tela.",
+  },
+];
 
 /** Gera um slug a partir do nome: "Loja São José" → "loja-sao-jose". */
 function slugify(value: string): string {
@@ -36,6 +55,7 @@ export function CompanyForm({ initialData, onSuccess }: CompanyFormProps) {
       name: initialData?.name || "",
       slug: initialData?.slug || "",
       is_private: initialData?.is_private || false,
+      transition: initialData?.transition ?? "slideFromRight",
       password: "",
     },
   });
@@ -93,6 +113,22 @@ export function CompanyForm({ initialData, onSuccess }: CompanyFormProps) {
             leftIcon={<span className="text-sm">/display/</span>}
             hint="Apenas letras minúsculas, números e hífens."
             error={errors.slug?.message}
+          />
+        )}
+      />
+
+      <Controller
+        control={form.control}
+        name="transition"
+        render={({ field }) => (
+          <Select
+            label="Transição entre anúncios"
+            options={transitionOptions}
+            value={field.value}
+            onValueChange={(value) =>
+              value && field.onChange(value as DisplayTransition)
+            }
+            error={errors.transition?.message}
           />
         )}
       />

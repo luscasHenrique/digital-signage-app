@@ -3,6 +3,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import {
+  ArrowUpDown,
   LayoutGrid,
   List,
   Megaphone,
@@ -29,12 +30,14 @@ import {
   getAdSchedule,
   type AdSchedule,
 } from "@/lib/advertisement-display";
+import { formatWeeklySchedule } from "@/lib/ad-weekly-schedule";
 import { formatPeriod } from "@/lib/format";
 import { normalizeSearch } from "@/lib/search";
 import { AdvertisementWithCompanies, Company } from "@/types";
 import { AdvertisementForm } from "./AdvertisementForm";
 import { AdvertisementPreview } from "./AdvertisementPreview";
 import { AdvertisementsCard } from "./AdvertisementsCard";
+import { ReorderAdsDialog } from "./ReorderAdsDialog";
 import { ScheduleBadge } from "./ScheduleBadge";
 
 interface AdvertisementsClientProps {
@@ -67,6 +70,7 @@ export function AdvertisementsClient({
   const [query, setQuery] = useState("");
   const [schedule, setSchedule] = useState<string>("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isReorderOpen, setIsReorderOpen] = useState(false);
   const [currentAd, setCurrentAd] = useState<AdvertisementWithCompanies | null>(
     null
   );
@@ -159,11 +163,17 @@ export function AdvertisementsClient({
       sortable: true,
       hideOnMobile: true,
       sortValue: (ad) => new Date(ad.end_date),
-      cell: (ad) => (
-        <span className="whitespace-nowrap">
-          {formatPeriod(ad.start_date, ad.end_date)}
-        </span>
-      ),
+      cell: (ad) => {
+        const weekly = formatWeeklySchedule(ad);
+        return (
+          <div className="whitespace-nowrap">
+            {formatPeriod(ad.start_date, ad.end_date)}
+            {weekly && (
+              <div className="text-sm text-muted-foreground">{weekly}</div>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "actions",
@@ -218,6 +228,14 @@ export function AdvertisementsClient({
                 { value: "table", icon: <List />, ariaLabel: "Tabela" },
               ]}
             />
+            <Button
+              variant="secondary"
+              leftIcon={<ArrowUpDown />}
+              onClick={() => setIsReorderOpen(true)}
+              disabled={initialAdvertisements.length < 2}
+            >
+              Ordem
+            </Button>
             <Button leftIcon={<Plus />} onClick={() => handleOpenModal(null)}>
               Novo anúncio
             </Button>
@@ -290,6 +308,12 @@ export function AdvertisementsClient({
           onSuccess={() => setIsModalOpen(false)}
         />
       </Dialog>
+
+      <ReorderAdsDialog
+        open={isReorderOpen}
+        onOpenChange={setIsReorderOpen}
+        ads={initialAdvertisements}
+      />
 
       <ConfirmDialog
         open={!!adToDelete}

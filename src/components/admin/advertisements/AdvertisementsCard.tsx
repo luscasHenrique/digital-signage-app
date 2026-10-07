@@ -1,10 +1,18 @@
 // src/components/admin/advertisements/AdvertisementsCard.tsx
 "use client";
 
-import { Building2, CalendarDays, Pencil, Timer, Trash2 } from "lucide-react";
+import {
+  Building2,
+  CalendarClock,
+  CalendarDays,
+  Pencil,
+  Timer,
+  Trash2,
+} from "lucide-react";
 import { RowActions } from "@/components/admin/RowActions";
 import { Badge } from "@/components/ui/Badge/Badge";
 import { Card } from "@/components/ui/Card/Card";
+import { formatWeeklySchedule } from "@/lib/ad-weekly-schedule";
 import { formatPeriod } from "@/lib/format";
 import { AdvertisementPreview } from "./AdvertisementPreview";
 import type { AdvertisementWithCompanies } from "@/types";
@@ -21,6 +29,7 @@ export function AdvertisementsCard({
   onEdit,
   onDelete,
 }: AdvertisementsCardProps) {
+  const weekly = formatWeeklySchedule(anuncio);
   return (
     <Card
       padding="none"
@@ -84,6 +93,13 @@ export function AdvertisementsCard({
             <CalendarDays className="size-4 shrink-0" aria-hidden />
             <dd>{formatPeriod(anuncio.start_date, anuncio.end_date)}</dd>
           </div>
+          {weekly && (
+            <div className="flex items-center gap-2">
+              <dt className="sr-only">Dias e horários</dt>
+              <CalendarClock className="size-4 shrink-0" aria-hidden />
+              <dd>{weekly}</dd>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <dt className="sr-only">Duração</dt>
             <Timer className="size-4 shrink-0" aria-hidden />

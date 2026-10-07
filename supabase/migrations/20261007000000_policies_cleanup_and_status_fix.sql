@@ -103,7 +103,8 @@ declare
   v_pk_col  text := coalesce(tg_argv[0], 'id'); -- nome da coluna PK
   v_jwt     jsonb;
   -- Colunas técnicas ou sensíveis que não vão para o log
-  v_skip    text[] := array['created_at', 'updated_at', 'last_edited_by', 'created_by', 'password'];
+  -- (position muda em lote ao reordenar; não vale um registro por anúncio)
+  v_skip    text[] := array['created_at', 'updated_at', 'last_edited_by', 'created_by', 'password', 'position'];
 begin
   v_user_id := auth.uid();
 

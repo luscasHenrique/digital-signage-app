@@ -4,7 +4,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAuthContext } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { isHttpUrl } from "@/lib/schemas";
+import {
+  isHttpUrl,
+  normalizeWeeklySchedule,
+  validateWeeklySchedule,
+  weeklyScheduleFields,
+} from "@/lib/schemas";
 import {
   ADVERTISEMENTS_BUCKET,
   extractStoragePathFromPublicUrl,
@@ -134,7 +139,14 @@ const actionSchema = z
     overlay_position: z.nativeEnum(OverlayPosition).optional(),
     overlay_bg_color: z.string().optional(),
     overlay_text_color: z.string().optional(),
+
+    ...weeklyScheduleFields,
   })
+  .superRefine((data, ctx) =>
+    validateWeeklySchedule(data, (path, message) =>
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message })
+    )
+  )
   .refine((data) => new Date(data.end_date) >= new Date(data.start_date), {
     message: "A data final deve ser igual ou posterior à data inicial.",
     path: ["end_date"],
@@ -183,7 +195,8 @@ export async function createAdvertisement(data: ActionInput) {
     return { success: false, message: { _server: ["Não autenticado"] } };
   const { supabase, user } = ctx;
 
-  const { company_ids, ...adData } = validation.data;
+  const { company_ids, ...fields } = validation.data;
+  const adData = { ...fields, ...normalizeWeeklySchedule(fields) };
 
   try {
     const { data: newAdArray, error: adError } = await supabase
@@ -231,7 +244,8 @@ export async function updateAdvertisement(data: ActionInput) {
     return { success: false, message: { _server: ["Não autenticado"] } };
   const { supabase, user } = ctx;
 
-  const { id, company_ids, ...adData } = validation.data;
+  const { id, company_ids, ...fields } = validation.data;
+  const adData = { ...fields, ...normalizeWeeklySchedule(fields) };
   if (!id) {
     return {
       success: false,
@@ -375,4 +389,24 @@ export async function discardUploads(urls: string[]) {
 
 function errorMessage(error: unknown, fallback = "Erro desconhecido."): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+/** Grava a ordem de exibição (o primeiro id passa primeiro na tela). */
+export async function reorderAdvertisements(ids: string[]) {
+  const parsed = z.array(z.string().uuid()).min(1).max(1000).safeParse(ids);
+  if (!parsed.success) return { success: false, message: "Lista inválida." };
+
+  const ctx = await getAuthContext();
+  if (!ctx) return { success: false, message: "Não autenticado." };
+
+  const { error } = await ctx.supabase.rpc("reorder_advertisements", {
+    p_ids: parsed.data,
+  });
+  if (error) {
+    console.error("Erro ao reordenar anúncios:", error);
+    return { success: false, message: "Não foi possível salvar a ordem." };
+  }
+
+  revalidatePath("/dashboard", "layout");
+  return { success: true, message: "Ordem salva." };
 }

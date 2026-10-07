@@ -1,5 +1,9 @@
 // src/lib/advertisement-display.ts
 import { Advertisement, AdvertisementStatus, AdvertisementType } from "@/types";
+import {
+  isWithinWeeklySchedule,
+  type WeeklySchedule,
+} from "@/lib/ad-weekly-schedule";
 
 export function getYoutubeVideoId(
   url: string | null | undefined
@@ -34,24 +38,31 @@ export function getYoutubeEmbedUrl(url: string): string | null {
     : null;
 }
 
-export type AdSchedule = "live" | "scheduled" | "expired" | "inactive";
+export type AdSchedule =
+  | "live"
+  | "offHours"
+  | "scheduled"
+  | "expired"
+  | "inactive";
 
 export const AD_SCHEDULE_LABEL: Record<AdSchedule, string> = {
   live: "No ar",
+  offHours: "Fora do horário",
   scheduled: "Agendado",
   expired: "Expirado",
   inactive: "Inativo",
 };
 
-/** Situação do anúncio considerando status e período de exibição. */
+/** Situação do anúncio considerando status, período e dias/horários. */
 export function getAdSchedule(
-  ad: Pick<Advertisement, "status" | "start_date" | "end_date">,
+  ad: Pick<Advertisement, "status" | "start_date" | "end_date"> &
+    WeeklySchedule,
   now: Date = new Date()
 ): AdSchedule {
   if (ad.status !== AdvertisementStatus.ACTIVE) return "inactive";
   if (new Date(ad.start_date) > now) return "scheduled";
   if (new Date(ad.end_date) < now) return "expired";
-  return "live";
+  return isWithinWeeklySchedule(ad, now) ? "live" : "offHours";
 }
 
 export const AD_TYPE_LABEL: Record<AdvertisementType, string> = {

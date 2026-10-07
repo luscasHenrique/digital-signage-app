@@ -41,12 +41,13 @@ export async function createCompany(
   if (!ctx) return NOT_AUTHENTICATED;
 
   try {
-    const { name, slug, is_private, password } = validation.data;
+    const { name, slug, is_private, transition, password } = validation.data;
 
     const { error } = await ctx.supabase.from("companies").insert({
       name,
       slug,
       is_private,
+      transition,
       password: is_private && password ? await hashPassword(password) : "",
     });
     if (error) throw error;
@@ -75,7 +76,7 @@ export async function updateCompany(
   const ctx = await getAuthContext();
   if (!ctx) return NOT_AUTHENTICATED;
 
-  const { id, name, slug, is_private, password } = validation.data;
+  const { id, name, slug, is_private, transition, password } = validation.data;
   if (!id) {
     return {
       success: false,
@@ -84,7 +85,12 @@ export async function updateCompany(
   }
 
   try {
-    const update: Record<string, unknown> = { name, slug, is_private };
+    const update: Record<string, unknown> = {
+      name,
+      slug,
+      is_private,
+      transition,
+    };
 
     if (!is_private) {
       update.password = "";

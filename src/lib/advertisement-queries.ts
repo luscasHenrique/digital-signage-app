@@ -23,6 +23,8 @@ export async function getAdvertisementsWithCompanies(
   let query = supabase
     .from("advertisements")
     .select(select)
+    // Mesma ordem do display
+    .order("position", { ascending: true })
     .order("created_at", { ascending: false });
   if (companyId) query = query.eq("link.company_id", companyId);
 

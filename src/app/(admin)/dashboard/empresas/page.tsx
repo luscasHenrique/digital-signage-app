@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { COMPANY_PUBLIC_COLUMNS } from "@/types";
+import { COMPANY_PUBLIC_COLUMNS, type CompanyWithStatus } from "@/types";
 import { CompaniesClient } from "@/components/admin/companies/CompaniesClient";
 
 export default async function EmpresasPage() {
@@ -7,7 +7,8 @@ export default async function EmpresasPage() {
 
   const { data: companies, error } = await supabase
     .from("companies")
-    .select(COMPANY_PUBLIC_COLUMNS)
+    // display_heartbeats é 1:1 com a empresa: vem como objeto (ou null)
+    .select(`${COMPANY_PUBLIC_COLUMNS}, heartbeat:display_heartbeats(last_seen_at)`)
     .order("name", { ascending: true });
 
   if (error) {
@@ -17,5 +18,9 @@ export default async function EmpresasPage() {
     );
   }
 
-  return <CompaniesClient companies={companies || []} />;
+  return (
+    <CompaniesClient
+      companies={(companies ?? []) as unknown as CompanyWithStatus[]}
+    />
+  );
 }

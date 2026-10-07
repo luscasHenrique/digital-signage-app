@@ -73,3 +73,20 @@ describe("startOfDay / endOfDay", () => {
     expect(d.getHours()).toBe(15);
   });
 });
+
+describe("getAdSchedule com dias/horários", () => {
+  it("fica 'fora do horário' quando o dia não está na programação", () => {
+    // 2026-10-06 12:00Z = terça (2) 09:00 em Brasília
+    const now = new Date("2026-10-06T12:00:00Z");
+    const ad = {
+      status: AdvertisementStatus.ACTIVE,
+      start_date: "2026-10-01",
+      end_date: "2026-10-31",
+    };
+    expect(getAdSchedule({ ...ad, weekdays: [2] }, now)).toBe("live");
+    expect(getAdSchedule({ ...ad, weekdays: [0, 6] }, now)).toBe("offHours");
+    expect(
+      getAdSchedule({ ...ad, daily_start: "18:00", daily_end: "22:00" }, now)
+    ).toBe("offHours");
+  });
+});

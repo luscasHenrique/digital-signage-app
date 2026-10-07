@@ -38,6 +38,11 @@ import {
 } from "@/lib/advertisement-display";
 import { applyActionErrors } from "@/lib/form-errors";
 import {
+  WEEKDAY_SHORT,
+  formatWeeklySchedule,
+  toHHMM,
+} from "@/lib/ad-weekly-schedule";
+import {
   advertisementFormSchema,
   type AdvertisementFormSchemaData,
 } from "@/lib/schemas";
@@ -100,6 +105,10 @@ const typeOptions = [
   },
 ];
 
+const ALL_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6];
+/** Ordem dos botões: começa na segunda */
+const WEEKDAY_BUTTONS = [1, 2, 3, 4, 5, 6, 0];
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-4 border-t border-border pt-5">
@@ -141,6 +150,12 @@ export function AdvertisementForm({
       overlay_position: initialData?.overlay_position || OverlayPosition.BOTTOM,
       overlay_bg_color: initialData?.overlay_bg_color || "rgba(0, 0, 0, 0.55)",
       overlay_text_color: initialData?.overlay_text_color || "#FFFFFF",
+      // Todos os dias marcados = sem restrição
+      weekdays: initialData?.weekdays?.length
+        ? initialData.weekdays
+        : ALL_WEEKDAYS,
+      daily_start: toHHMM(initialData?.daily_start),
+      daily_end: toHHMM(initialData?.daily_end),
     },
   });
   const { errors, isSubmitting } = form.formState;
@@ -149,6 +164,12 @@ export function AdvertisementForm({
   const contentUrl = form.watch("content_url");
   const startDate = form.watch("start_date");
   const overlayText = form.watch("overlay_text");
+  const weekly = form.watch(["weekdays", "daily_start", "daily_end"]);
+  const weeklySummary = formatWeeklySchedule({
+    weekdays: weekly[0],
+    daily_start: weekly[1],
+    daily_end: weekly[2],
+  });
   const overlay = form.watch([
     "overlay_position",
     "overlay_bg_color",
@@ -183,6 +204,9 @@ export function AdvertisementForm({
       overlay_position: data.overlay_position,
       overlay_bg_color: data.overlay_bg_color,
       overlay_text_color: data.overlay_text_color,
+      weekdays: data.weekdays,
+      daily_start: data.daily_start,
+      daily_end: data.daily_end,
     };
 
     const action = initialData ? updateAdvertisement : createAdvertisement;
@@ -443,6 +467,85 @@ export function AdvertisementForm({
             />
           )}
         />
+      </Section>
+
+      <Section title="Dias e horários">
+        <Controller
+          control={form.control}
+          name="weekdays"
+          render={({ field }) => {
+            const selected = field.value ?? ALL_WEEKDAYS;
+            const toggle = (day: number) =>
+              field.onChange(
+                selected.includes(day)
+                  ? selected.filter((d) => d !== day)
+                  : [...selected, day]
+              );
+            return (
+              <fieldset className="flex flex-col gap-1.5">
+                <legend className="mb-1.5 text-sm font-medium">
+                  Dias da semana
+                </legend>
+                <div className="flex flex-wrap gap-1.5">
+                  {WEEKDAY_BUTTONS.map((day) => (
+                    <Button
+                      key={day}
+                      type="button"
+                      size="sm"
+                      variant={selected.includes(day) ? "primary" : "secondary"}
+                      aria-pressed={selected.includes(day)}
+                      onClick={() => toggle(day)}
+                      className="min-w-12"
+                    >
+                      {WEEKDAY_SHORT[day]}
+                    </Button>
+                  ))}
+                </div>
+                {errors.weekdays?.message && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {errors.weekdays.message}
+                  </p>
+                )}
+              </fieldset>
+            );
+          }}
+        />
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Controller
+            control={form.control}
+            name="daily_start"
+            render={({ field }) => (
+              <TextField
+                {...field}
+                value={field.value ?? ""}
+                type="time"
+                label="Das"
+                optional
+                error={errors.daily_start?.message}
+              />
+            )}
+          />
+          <Controller
+            control={form.control}
+            name="daily_end"
+            render={({ field }) => (
+              <TextField
+                {...field}
+                value={field.value ?? ""}
+                type="time"
+                label="Até"
+                optional
+                error={errors.daily_end?.message}
+              />
+            )}
+          />
+        </div>
+        <p className="-mt-2 text-sm text-muted-foreground">
+          {weeklySummary
+            ? `Exibe só em: ${weeklySummary} (horário de Brasília).`
+            : "Exibe todos os dias, o dia inteiro. Deixe os horários em branco para não limitar."}
+        </p>
       </Section>
 
       <Section title="Texto sobre o anúncio (opcional)">
