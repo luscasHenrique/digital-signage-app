@@ -36,6 +36,7 @@ import {
 } from "@/lib/advertisement-display";
 import { applyActionErrors } from "@/lib/form-errors";
 import { toHHMM } from "@/lib/ad-weekly-schedule";
+import { MAX_IMAGE_SOURCE_BYTES } from "@/lib/image-optimize";
 import {
   advertisementFormSchema,
   type AdvertisementFormSchemaData,
@@ -43,7 +44,6 @@ import {
 import {
   ALLOWED_IMAGE_TYPES,
   ALLOWED_VIDEO_TYPES,
-  MAX_IMAGE_BYTES,
   MAX_VIDEO_BYTES,
 } from "@/lib/storage";
 import {
@@ -287,7 +287,7 @@ export function AdvertisementForm({
                 ).join(",")}
                 maxSize={
                   adType === AdvertisementType.IMAGE_UPLOAD
-                    ? MAX_IMAGE_BYTES
+                    ? MAX_IMAGE_SOURCE_BYTES
                     : MAX_VIDEO_BYTES
                 }
                 title={
@@ -355,7 +355,7 @@ export function AdvertisementForm({
                 multiple={false}
                 title="Enviar imagem"
                 accept={ALLOWED_IMAGE_TYPES.join(",")}
-                maxSize={MAX_IMAGE_BYTES}
+                maxSize={MAX_IMAGE_SOURCE_BYTES}
                 upload={createUploadHandler((url) => {
                   form.setValue("thumbnail_url", url);
                   form.clearErrors("thumbnail_url");

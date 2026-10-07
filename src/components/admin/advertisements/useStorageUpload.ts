@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { discardUploads, getSignedUploadUrl } from "@/actions/advertisements";
 import type { UploadHandler } from "@/components/ui/FileUpload/FileUpload";
+import { optimizeImageForUpload } from "@/lib/image-optimize";
 import { validateUploadFile } from "@/lib/storage";
 
 /** PUT do arquivo na URL assinada com progresso real e cancelamento. */
@@ -41,7 +42,9 @@ export function useStorageUpload() {
 
   const createUploadHandler = useCallback(
     (onUploaded: (publicUrl: string) => void): UploadHandler =>
-      async (file, { onProgress, signal }) => {
+      async (original, { onProgress, signal }) => {
+        // Imagens grandes viram WebP em até 4K antes de subir
+        const file = await optimizeImageForUpload(original);
         const invalid = validateUploadFile(file);
         if (invalid) throw new Error(invalid);
 
