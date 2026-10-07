@@ -6,6 +6,9 @@ import { Card } from "@/components/ui/Card/Card";
 import { ONLINE_THRESHOLD_MS } from "@/lib/display-status";
 import { createClient } from "@/lib/supabase/server";
 import { AdvertisementStatus } from "@/types";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Dashboard" };
 
 export const dynamic = "force-dynamic";
 

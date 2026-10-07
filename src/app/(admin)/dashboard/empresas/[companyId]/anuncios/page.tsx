@@ -6,6 +6,9 @@ import {
   getCompanies,
 } from "@/lib/advertisement-queries";
 import { createClient } from "@/lib/supabase/server";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Anúncios da empresa" };
 
 export const dynamic = "force-dynamic";
 

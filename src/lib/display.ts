@@ -1,6 +1,7 @@
 // src/lib/display.ts
 import "server-only";
 
+import { cache } from "react";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { passwordFingerprint } from "@/lib/password";
 import { verifyDisplayToken } from "@/lib/display-token";
@@ -23,7 +24,8 @@ export interface DisplayCompany {
   transition: DisplayTransition;
 }
 
-export async function getDisplayCompany(
+/** Deduplicado por requisição (metadata + página buscam a mesma empresa). */
+export const getDisplayCompany = cache(async function getDisplayCompany(
   slug: string
 ): Promise<DisplayCompany | null> {
   const { data, error } = await supabaseAdmin
@@ -34,7 +36,7 @@ export async function getDisplayCompany(
 
   if (error) throw error;
   return data;
-}
+});
 
 export async function hasDisplayAccess(
   company: DisplayCompany,

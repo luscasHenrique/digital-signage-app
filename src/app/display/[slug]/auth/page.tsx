@@ -1,10 +1,23 @@
 // src/app/display/[slug]/auth/page.tsx
 import { cookies } from "next/headers";
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { PasswordForm } from "@/components/auth/PasswordForm";
 import styles from "@/components/auth/auth.module.css";
 import { getDisplayCompany, hasDisplayAccess } from "@/lib/display";
 import { displayTokenCookieName } from "@/lib/display-token";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const company = await getDisplayCompany((await params).slug).catch(() => null);
+  return {
+    title: company ? `${company.name} · Acesso` : "Tela",
+    robots: { index: false, follow: false },
+  };
+}
 
 export const dynamic = "force-dynamic";
 

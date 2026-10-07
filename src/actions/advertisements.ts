@@ -410,3 +410,69 @@ export async function reorderAdvertisements(ids: string[]) {
   revalidatePath("/dashboard", "layout");
   return { success: true, message: "Ordem salva." };
 }
+
+const idsSchema = z.array(z.string().uuid()).min(1).max(500);
+
+/** Ativa ou desativa vários anúncios de uma vez. */
+export async function setAdvertisementsStatus(
+  ids: string[],
+  status: AdvertisementStatus
+) {
+  const parsed = idsSchema.safeParse(ids);
+  const parsedStatus = z.nativeEnum(AdvertisementStatus).safeParse(status);
+  if (!parsed.success || !parsedStatus.success) {
+    return { success: false, message: "Seleção inválida." };
+  }
+
+  const ctx = await getAuthContext();
+  if (!ctx) return { success: false, message: "Não autenticado." };
+
+  const { error } = await ctx.supabase
+    .from("advertisements")
+    .update({ status: parsedStatus.data, last_edited_by: ctx.user.id })
+    .in("id", parsed.data);
+  if (error) {
+    console.error("Erro ao alterar status em lote:", error);
+    return { success: false, message: "Não foi possível alterar os anúncios." };
+  }
+
+  revalidatePath("/dashboard", "layout");
+  const verb = parsedStatus.data === AdvertisementStatus.ACTIVE ? "ativado(s)" : "desativado(s)";
+  return { success: true, message: `${parsed.data.length} anúncio(s) ${verb}.` };
+}
+
+/** Exclui vários anúncios e apaga as mídias que ficarem sem uso. */
+export async function deleteAdvertisements(ids: string[]) {
+  const parsed = idsSchema.safeParse(ids);
+  if (!parsed.success) return { success: false, message: "Seleção inválida." };
+
+  const ctx = await getAuthContext();
+  if (!ctx) return { success: false, message: "Não autenticado." };
+
+  try {
+    const { data: ads, error: fetchErr } = await ctx.supabase
+      .from("advertisements")
+      .select("content_url, thumbnail_url")
+      .in("id", parsed.data);
+    if (fetchErr) throw fetchErr;
+
+    const { error } = await ctx.supabase
+      .from("advertisements")
+      .delete()
+      .in("id", parsed.data);
+    if (error) throw error;
+
+    await removeStorageFiles(
+      (ads ?? []).flatMap((ad) => [ad.content_url, ad.thumbnail_url])
+    );
+
+    revalidatePath("/dashboard", "layout");
+    return {
+      success: true,
+      message: `${parsed.data.length} anúncio(s) excluído(s).`,
+    };
+  } catch (error) {
+    console.error("Erro ao excluir anúncios em lote:", error);
+    return { success: false, message: "Não foi possível excluir os anúncios." };
+  }
+}

@@ -3,6 +3,9 @@ import { UsersClient } from "@/components/admin/users/UsersClient";
 import { requireAdminPage } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { UserRole, UserWithProfile } from "@/types";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Usuários" };
 
 const PAGE_SIZE = 1000;
 

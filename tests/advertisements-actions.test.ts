@@ -23,7 +23,9 @@ vi.mock("@/lib/supabase/admin", () => ({
 import {
   createAdvertisement,
   deleteAdvertisement,
+  deleteAdvertisements,
   discardUploads,
+  setAdvertisementsStatus,
 } from "@/actions/advertisements";
 
 const STORAGE =
@@ -118,5 +120,49 @@ describe("limpeza do Storage", () => {
     const result = await discardUploads([`${STORAGE}/outro/a.png`]);
     expect(result.message).toBe("Nada a remover.");
     expect(mocks.storageRemove).not.toHaveBeenCalled();
+  });
+});
+
+describe("ações em lote", () => {
+  const ID1 = "11111111-1111-4111-8111-111111111111";
+  const ID2 = "22222222-2222-4222-8222-222222222222";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.storageRemove.mockResolvedValue({ error: null });
+  });
+
+  it("recusa ids inválidos sem consultar a sessão", async () => {
+    const result = await setAdvertisementsStatus(
+      ["nao-e-uuid"],
+      AdvertisementStatus.ACTIVE
+    );
+    expect(result.success).toBe(false);
+    expect(mocks.getAuthContext).not.toHaveBeenCalled();
+  });
+
+  it("altera o status de todos os selecionados numa consulta", async () => {
+    const { client, log } = fakeClient({ advertisements: [{}] });
+    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" }, supabase: client });
+
+    const result = await setAdvertisementsStatus([ID1, ID2], AdvertisementStatus.INACTIVE);
+    expect(result).toEqual({ success: true, message: "2 anúncio(s) desativado(s)." });
+    expect(log[0].calls).toContainEqual(["in", ["id", [ID1, ID2]]]);
+  });
+
+  it("exclui vários e apaga as mídias sem uso", async () => {
+    const { client } = fakeClient({
+      advertisements: [
+        { data: [{ content_url: `${STORAGE}/u/a.png`, thumbnail_url: null }] },
+        {},
+      ],
+    });
+    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" }, supabase: client });
+    const admin = fakeClient({ advertisements: [{ data: [] }, { data: [] }] });
+    mocks.adminFrom.mockImplementation(admin.client.from);
+
+    const result = await deleteAdvertisements([ID1]);
+    expect(result.success).toBe(true);
+    expect(mocks.storageRemove).toHaveBeenCalledWith(["u/a.png"]);
   });
 });

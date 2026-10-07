@@ -1,5 +1,6 @@
 // src/app/display/[slug]/page.tsx
 import { cookies, headers } from "next/headers";
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { CompanyDisplay } from "@/components/display/CompanyDisplay";
 import { DisplayError } from "@/components/display/DisplayError";
@@ -12,6 +13,18 @@ import {
 import { displayTokenCookieName } from "@/lib/display-token";
 
 export const revalidate = 0; // sem cache
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const company = await getDisplayCompany((await params).slug).catch(() => null);
+  return {
+    title: company ? `${company.name}` : "Tela",
+    robots: { index: false, follow: false },
+  };
+}
+
 export const dynamic = "force-dynamic"; // SSR dinâmico
 
 interface DisplayPageProps {

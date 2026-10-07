@@ -4,14 +4,21 @@
 import { useMemo, useState, useTransition } from "react";
 import {
   ArrowUpDown,
+  Copy,
   LayoutGrid,
   List,
   Megaphone,
   Pencil,
   Plus,
+  Power,
+  PowerOff,
   Trash2,
 } from "lucide-react";
-import { deleteAdvertisement } from "@/actions/advertisements";
+import {
+  deleteAdvertisement,
+  deleteAdvertisements,
+  setAdvertisementsStatus,
+} from "@/actions/advertisements";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { RowActions } from "@/components/admin/RowActions";
@@ -33,7 +40,11 @@ import {
 import { formatWeeklySchedule } from "@/lib/ad-weekly-schedule";
 import { formatPeriod } from "@/lib/format";
 import { normalizeSearch } from "@/lib/search";
-import { AdvertisementWithCompanies, Company } from "@/types";
+import {
+  AdvertisementStatus,
+  AdvertisementWithCompanies,
+  Company,
+} from "@/types";
 import { AdvertisementForm } from "./AdvertisementForm";
 import { AdvertisementPreview } from "./AdvertisementPreview";
 import { AdvertisementsCard } from "./AdvertisementsCard";
@@ -74,6 +85,11 @@ export function AdvertisementsClient({
   const [currentAd, setCurrentAd] = useState<AdvertisementWithCompanies | null>(
     null
   );
+  const [duplicating, setDuplicating] = useState(false);
+  // Seleção da tabela (ações em lote)
+  const [selected, setSelected] = useState<string[]>([]);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [isBulkPending, startBulkTransition] = useTransition();
   const [adToDelete, setAdToDelete] =
     useState<AdvertisementWithCompanies | null>(null);
   const [isDeletePending, startDeleteTransition] = useTransition();
@@ -91,10 +107,33 @@ export function AdvertisementsClient({
     );
   }, [initialAdvertisements, query, schedule]);
 
-  const handleOpenModal = (ad: AdvertisementWithCompanies | null) => {
+  const handleOpenModal = (
+    ad: AdvertisementWithCompanies | null,
+    duplicate = false
+  ) => {
     setCurrentAd(ad);
+    setDuplicating(duplicate);
     setIsModalOpen(true);
   };
+
+  // Só conta o que ainda existe e está visível no filtro atual
+  const selectedIds = selected.filter((id) =>
+    filtered.some((ad) => ad.id === id)
+  );
+
+  const runBulk = (
+    action: () => Promise<{ success: boolean; message: string }>
+  ) =>
+    startBulkTransition(async () => {
+      const result = await action();
+      if (result.success) {
+        toast.success(result.message);
+        setSelected([]);
+      } else {
+        toast.error(result.message);
+      }
+      setConfirmBulkDelete(false);
+    });
 
   const handleDeleteAd = () => {
     if (!adToDelete) return;
@@ -109,6 +148,11 @@ export function AdvertisementsClient({
 
   const actionsFor = (ad: AdvertisementWithCompanies) => [
     { label: "Editar", icon: <Pencil />, onSelect: () => handleOpenModal(ad) },
+    {
+      label: "Duplicar",
+      icon: <Copy />,
+      onSelect: () => handleOpenModal(ad, true),
+    },
     { type: "separator" as const },
     {
       label: "Excluir",
@@ -184,6 +228,53 @@ export function AdvertisementsClient({
     },
   ];
 
+  const bulkActions = selectedIds.length > 0 && (
+    <div
+      className="flex flex-wrap items-center gap-2"
+      role="group"
+      aria-label="Ações em lote"
+    >
+      <span className="text-sm text-muted-foreground">
+        {selectedIds.length} selecionado(s)
+      </span>
+      <Button
+        size="sm"
+        variant="secondary"
+        leftIcon={<Power />}
+        disabled={isBulkPending}
+        onClick={() =>
+          runBulk(() =>
+            setAdvertisementsStatus(selectedIds, AdvertisementStatus.ACTIVE)
+          )
+        }
+      >
+        Ativar
+      </Button>
+      <Button
+        size="sm"
+        variant="secondary"
+        leftIcon={<PowerOff />}
+        disabled={isBulkPending}
+        onClick={() =>
+          runBulk(() =>
+            setAdvertisementsStatus(selectedIds, AdvertisementStatus.INACTIVE)
+          )
+        }
+      >
+        Desativar
+      </Button>
+      <Button
+        size="sm"
+        variant="danger"
+        leftIcon={<Trash2 />}
+        disabled={isBulkPending}
+        onClick={() => setConfirmBulkDelete(true)}
+      >
+        Excluir
+      </Button>
+    </div>
+  );
+
   const filters = (
     <div className="flex flex-wrap items-center gap-2">
       <TextField
@@ -252,7 +343,8 @@ export function AdvertisementsClient({
                 <AdvertisementsCard
                   key={ad.id}
                   anuncio={ad}
-                  onEdit={handleOpenModal}
+                  onEdit={(item) => handleOpenModal(item)}
+                  onDuplicate={(item) => handleOpenModal(item, true)}
                   onDelete={setAdToDelete}
                 />
               ))}
@@ -284,7 +376,15 @@ export function AdvertisementsClient({
           data={filtered}
           rowKey={(ad) => ad.id}
           pageSize={10}
-          toolbar={filters}
+          selectable
+          selected={selectedIds}
+          onSelectedChange={setSelected}
+          toolbar={
+            <div className="flex w-full flex-wrap items-center justify-between gap-2">
+              {filters}
+              {bulkActions}
+            </div>
+          }
           empty={emptyMessage}
         />
       )}
@@ -293,16 +393,23 @@ export function AdvertisementsClient({
         open={isModalOpen}
         onOpenChange={setIsModalOpen}
         size="lg"
-        title={currentAd ? "Editar anúncio" : "Novo anúncio"}
+        title={
+          duplicating
+            ? "Duplicar anúncio"
+            : currentAd
+              ? "Editar anúncio"
+              : "Novo anúncio"
+        }
         description={
-          currentAd
+          currentAd && !duplicating
             ? "Atualize o conteúdo e o período de exibição."
             : "Escolha o conteúdo, as telas e o período de exibição."
         }
       >
         <AdvertisementForm
-          key={currentAd?.id ?? "new"}
+          key={`${currentAd?.id ?? "new"}-${duplicating}`}
           initialData={currentAd}
+          duplicate={duplicating}
           companies={companies}
           defaultCompanyId={defaultCompanyId}
           onSuccess={() => setIsModalOpen(false)}
@@ -313,6 +420,16 @@ export function AdvertisementsClient({
         open={isReorderOpen}
         onOpenChange={setIsReorderOpen}
         ads={initialAdvertisements}
+      />
+
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        onOpenChange={setConfirmBulkDelete}
+        title={`Excluir ${selectedIds.length} anúncio(s)?`}
+        description="Os anúncios saem de todas as telas e os arquivos que nenhum outro anúncio usa são apagados. Esta ação não pode ser desfeita."
+        confirmLabel="Excluir anúncios"
+        loading={isBulkPending}
+        onConfirm={() => runBulk(() => deleteAdvertisements(selectedIds))}
       />
 
       <ConfirmDialog

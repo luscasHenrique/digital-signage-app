@@ -5,6 +5,7 @@ import {
   Building2,
   CalendarClock,
   CalendarDays,
+  Copy,
   Pencil,
   Timer,
   Trash2,
@@ -21,12 +22,14 @@ import { ScheduleBadge } from "./ScheduleBadge";
 interface AdvertisementsCardProps {
   anuncio: AdvertisementWithCompanies;
   onEdit: (anuncio: AdvertisementWithCompanies) => void;
+  onDuplicate: (anuncio: AdvertisementWithCompanies) => void;
   onDelete: (anuncio: AdvertisementWithCompanies) => void;
 }
 
 export function AdvertisementsCard({
   anuncio,
   onEdit,
+  onDuplicate,
   onDelete,
 }: AdvertisementsCardProps) {
   const weekly = formatWeeklySchedule(anuncio);
@@ -62,6 +65,11 @@ export function AdvertisementsCard({
                 label: "Editar",
                 icon: <Pencil />,
                 onSelect: () => onEdit(anuncio),
+              },
+              {
+                label: "Duplicar",
+                icon: <Copy />,
+                onSelect: () => onDuplicate(anuncio),
               },
               { type: "separator" },
               {

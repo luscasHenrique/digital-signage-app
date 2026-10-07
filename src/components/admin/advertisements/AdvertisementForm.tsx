@@ -66,6 +66,8 @@ type ActionInput = Parameters<typeof createAdvertisement>[0];
 
 interface AdvertisementFormProps {
   initialData: AdvertisementWithCompanies | null;
+  /** Usa initialData como modelo e cria um anúncio novo */
+  duplicate?: boolean;
   companies: Company[];
   /** Empresa já marcada ao criar (ex.: na página de anúncios de uma empresa) */
   defaultCompanyId?: string;
@@ -120,6 +122,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 export function AdvertisementForm({
   initialData,
+  duplicate = false,
   companies,
   defaultCompanyId,
   onSuccess,
@@ -131,8 +134,12 @@ export function AdvertisementForm({
   const form = useForm<AdvertisementFormSchemaData>({
     resolver: zodResolver(advertisementFormSchema),
     defaultValues: {
-      id: initialData?.id || undefined,
-      title: initialData?.title || "",
+      id: duplicate ? undefined : initialData?.id || undefined,
+      title: initialData
+        ? duplicate
+          ? `${initialData.title} (cópia)`
+          : initialData.title
+        : "",
       description: initialData?.description || "",
       type: initialData?.type,
       content_url: initialData?.content_url || "",
@@ -209,7 +216,8 @@ export function AdvertisementForm({
       daily_end: data.daily_end,
     };
 
-    const action = initialData ? updateAdvertisement : createAdvertisement;
+    const isEdit = !!initialData && !duplicate;
+    const action = isEdit ? updateAdvertisement : createAdvertisement;
     const result = await action(finalData);
 
     if (result.success) {
@@ -656,7 +664,7 @@ export function AdvertisementForm({
       >
         {isUploading
           ? "Aguardando envio do arquivo..."
-          : initialData
+          : initialData && !duplicate
             ? "Salvar alterações"
             : "Criar anúncio"}
       </Button>

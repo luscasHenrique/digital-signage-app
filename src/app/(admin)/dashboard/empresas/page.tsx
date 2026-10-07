@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { COMPANY_PUBLIC_COLUMNS, type CompanyWithStatus } from "@/types";
 import { CompaniesClient } from "@/components/admin/companies/CompaniesClient";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Empresas" };
 
 export default async function EmpresasPage() {
   const supabase = createClient();

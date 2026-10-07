@@ -13,6 +13,9 @@ import {
   sanitizeAuditSearchTerm,
   toAuditAction,
 } from "@/types/audit";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Auditoria" };
 
 export const revalidate = 0;
 export const dynamic = "force-dynamic";
