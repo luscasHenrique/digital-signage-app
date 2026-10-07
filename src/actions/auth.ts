@@ -1,16 +1,33 @@
-// src/actions/auth.ts
 "use server";
 
 import { createActionClient } from "@/lib/supabase/server";
+import { createPersistentRateLimiter } from "@/lib/persistent-rate-limit";
+import { getClientIp } from "@/lib/request-ip";
 import { revalidatePath } from "next/cache";
 
 type ActionResult = { success: boolean; message: string };
+
+// Além do limite do próprio Supabase Auth: trava força bruta por IP + e-mail.
+const loginAttempts = createPersistentRateLimiter({
+  limit: 10,
+  windowMs: 15 * 60 * 1000,
+});
 
 export async function login(formData: FormData): Promise<ActionResult> {
   const supabase = createActionClient();
 
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
+
+  const rateKey = `login:${await getClientIp()}:${email.trim().toLowerCase()}`;
+  const attempt = await loginAttempts.consume(rateKey);
+  if (!attempt.allowed) {
+    const minutes = Math.ceil(attempt.retryAfterMs / 60000);
+    return {
+      success: false,
+      message: `Muitas tentativas. Tente novamente em ${minutes} minuto(s).`,
+    };
+  }
 
   const { error } = await supabase.auth.signInWithPassword({
     email,
@@ -25,6 +42,7 @@ export async function login(formData: FormData): Promise<ActionResult> {
     };
   }
 
+  await loginAttempts.reset(rateKey);
   revalidatePath("/", "layout");
   return { success: true, message: "Login bem-sucedido!" };
 }
@@ -39,12 +57,11 @@ export async function logout(): Promise<ActionResult> {
     revalidatePath("/");
     return { success: true, message: "Você saiu com sucesso." };
   } catch (error) {
+    // O detalhe técnico fica só no log do servidor.
     console.error("ERRO NO LOGOUT:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
     return {
       success: false,
-      message: `Falha ao fazer logout: ${errorMessage}`,
+      message: "Não foi possível sair. Tente novamente.",
     };
   }
 }

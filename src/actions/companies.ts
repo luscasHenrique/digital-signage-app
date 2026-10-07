@@ -1,6 +1,6 @@
 // src/actions/companies.ts
 "use server";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getAuthContext } from "@/lib/auth";
@@ -17,6 +17,7 @@ import {
   displayTokenCookieName,
 } from "@/lib/display-token";
 import { createPersistentRateLimiter } from "@/lib/persistent-rate-limit";
+import { getClientIp } from "@/lib/request-ip";
 
 type FieldErrors = Record<string, string[] | undefined>;
 type FormActionResult =
@@ -172,13 +173,7 @@ export async function verifyCompanyPassword(
 
   const { slug, password } = validation.data;
 
-  const headerList = await headers();
-  // Na Vercel, x-real-ip / x-forwarded-for são definidos pela própria plataforma
-  const ip =
-    headerList.get("x-real-ip") ||
-    headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    "unknown";
-  const rateKey = `display-password:${ip}:${slug}`;
+  const rateKey = `display-password:${await getClientIp()}:${slug}`;
 
   const attempt = await passwordAttempts.consume(rateKey);
   if (!attempt.allowed) {

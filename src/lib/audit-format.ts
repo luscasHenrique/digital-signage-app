@@ -33,6 +33,7 @@ const FIELD_LABEL: Record<string, string> = {
   slug: "Slug",
   is_private: "Privada",
   password: "Senha",
+  password_changed: "Senha alterada",
   email: "E-mail",
   full_name: "Nome completo",
   role: "Função",
