@@ -1,5 +1,5 @@
 // src/config/menuData.ts
-import { Home, Megaphone, Building2, Settings } from "lucide-react";
+import { Home, Megaphone, Building2, Settings, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { UserRole } from "@/types";
 
@@ -41,6 +41,7 @@ export const menuData: MenuItem[] = [
       },
     ],
   },
+  { id: "conta", href: "/dashboard/conta", label: "Minha conta", icon: UserRound },
 ];
 
 /** Item de menu mais específico que corresponde à rota atual. */

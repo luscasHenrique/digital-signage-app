@@ -26,6 +26,7 @@ export function LoginForm({ message }: { message?: string }) {
         subtitle="Digite seu e-mail e senha para gerenciar seus anúncios."
         submitLabel="Entrar"
         showRemember={false}
+        onForgotPassword={() => router.push("/recuperar-senha")}
         onSubmit={async ({ email, password }) => {
           const formData = new FormData();
           formData.append("email", email);
