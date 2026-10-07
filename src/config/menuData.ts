@@ -52,6 +52,7 @@ export const menuData: MenuItem[] = [
         href: "/dashboard/admin/auditoria",
         label: "Auditoria",
       },
+      { id: "erros", href: "/dashboard/admin/erros", label: "Erros" },
     ],
   },
   { id: "conta", href: "/dashboard/conta", label: "Minha conta", icon: UserRound },

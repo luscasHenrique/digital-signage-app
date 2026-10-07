@@ -1,5 +1,6 @@
 // src/app/api/cron/cleanup-uploads/route.ts
 import { NextResponse, type NextRequest } from "next/server";
+import { purgeOldErrorLogs } from "@/lib/error-log";
 import { cleanupOrphanUploads } from "@/lib/storage-cleanup";
 
 export const dynamic = "force-dynamic";
@@ -13,8 +14,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await cleanupOrphanUploads();
-    console.info("Limpeza de uploads órfãos:", result);
+    const uploads = await cleanupOrphanUploads();
+    // Aproveita a rotina diária para limpar erros antigos (30 dias)
+    const errorLogsRemoved = await purgeOldErrorLogs();
+    const result = { ...uploads, errorLogsRemoved };
+    console.info("Limpeza diária:", result);
     return NextResponse.json(result);
   } catch (error) {
     console.error("Erro na limpeza de uploads órfãos:", error);

@@ -8,6 +8,7 @@ import {
   recordDisplayHeartbeat,
 } from "@/lib/display";
 import { displayTokenCookieName } from "@/lib/display-token";
+import { logError } from "@/lib/error-log";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,20 @@ export async function GET(
     });
   } catch (error) {
     console.error("Erro ao carregar anúncios do display:", error);
+    await logError({
+      source: "server",
+      message: `API do display (${slug}): ${errorText(error)}`,
+      stack: error instanceof Error ? error.stack : null,
+      url: `GET /api/display/${slug}`,
+    });
     return NextResponse.json({ error: "server_error" }, { status: 500 });
   }
+}
+
+function errorText(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object" && "message" in error) {
+    return String((error as { message: unknown }).message);
+  }
+  return String(error);
 }

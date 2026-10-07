@@ -298,6 +298,47 @@ export type Database = {
           }
         ];
       };
+      "error_logs": {
+        Row: {
+          "context": Json | null;
+          "created_at": string;
+          "digest": string | null;
+          "id": number;
+          "message": string;
+          "source": string;
+          "stack": string | null;
+          "url": string | null;
+          "user_agent": string | null;
+          "user_id": string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          "context"?: Json | null;
+          "created_at"?: string;
+          "digest"?: string | null;
+          "id"?: never;
+          "message": string;
+          "source": string;
+          "stack"?: string | null;
+          "url"?: string | null;
+          "user_agent"?: string | null;
+          "user_id"?: string | null;
+        };
+        Update: {
+          "context"?: Json | null;
+          "created_at"?: string;
+          "digest"?: string | null;
+          "id"?: never;
+          "message"?: string;
+          "source"?: string;
+          "stack"?: string | null;
+          "url"?: string | null;
+          "user_agent"?: string | null;
+          "user_id"?: string | null;
+        };
+        Relationships: [
+        ];
+      };
       "profiles": {
         Row: {
           "avatar_url": string | null;

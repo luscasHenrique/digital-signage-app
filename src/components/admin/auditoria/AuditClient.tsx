@@ -4,8 +4,6 @@
 import { useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  ChevronLeft,
-  ChevronRight,
   Copy,
   History,
   Minus,
@@ -14,6 +12,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { PageHeader } from "@/components/admin/PageHeader";
+import { PaginationNav } from "@/components/admin/PaginationNav";
 import {
   Accordion,
   type AccordionItem,
@@ -269,44 +268,23 @@ export default function AuditClient({
         </Card>
       )}
 
-      <nav
-        aria-label="Paginação"
-        className="flex flex-wrap items-center justify-between gap-3"
-      >
-        <Select
-          size="sm"
-          aria-label="Itens por página"
-          options={perPageOptions}
-          value={String(perPage)}
-          onValueChange={(value) =>
-            value && navigate({ perPage: value, page: 1 })
-          }
-          containerClassName="w-40"
-        />
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
+      <PaginationNav
+        page={page}
+        totalPages={totalPages}
+        onPageChange={(next) => navigate({ page: next })}
+        start={
+          <Select
             size="sm"
-            leftIcon={<ChevronLeft />}
-            disabled={page <= 1}
-            onClick={() => navigate({ page: page - 1 })}
-          >
-            Anterior
-          </Button>
-          <span className="px-1 text-sm text-muted-foreground">
-            Página {page} de {totalPages}
-          </span>
-          <Button
-            variant="secondary"
-            size="sm"
-            rightIcon={<ChevronRight />}
-            disabled={page >= totalPages}
-            onClick={() => navigate({ page: page + 1 })}
-          >
-            Próxima
-          </Button>
-        </div>
-      </nav>
+            aria-label="Itens por página"
+            options={perPageOptions}
+            value={String(perPage)}
+            onValueChange={(value) =>
+              value && navigate({ perPage: value, page: 1 })
+            }
+            containerClassName="w-40"
+          />
+        }
+      />
     </>
   );
 }

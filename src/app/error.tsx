@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/Button/Button";
 import { Card } from "@/components/ui/Card/Card";
+import { reportClientError } from "@/lib/error-reporter";
 
 export default function Error({
   error,
@@ -14,6 +15,7 @@ export default function Error({
 }) {
   useEffect(() => {
     console.error(error);
+    reportClientError(error, { context: { kind: "error-boundary" } });
   }, [error]);
 
   return (

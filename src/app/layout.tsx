@@ -4,6 +4,7 @@ import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/ui/Theme/ThemeProvider";
 import { ThemeScript } from "@/components/ui/Theme/ThemeScript";
 import { ToastProvider } from "@/components/ui/Toast/Toast";
+import { ErrorReporter } from "@/components/ErrorReporter";
 import "./globals.css";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
@@ -52,6 +53,7 @@ export default function RootLayout({
             <span />
           </div>
           <ToastProvider>{children}</ToastProvider>
+          <ErrorReporter />
         </ThemeProvider>
       </body>
     </html>

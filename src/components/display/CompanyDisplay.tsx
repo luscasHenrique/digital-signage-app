@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getYoutubeEmbedUrl } from "@/lib/advertisement-display";
 import { isPlayableNow } from "@/lib/ad-weekly-schedule";
+import { reportClientError } from "@/lib/error-reporter";
 import { isOptimizableImage } from "@/lib/storage";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeScope } from "@/components/ui/Theme/ThemeScope";
@@ -142,9 +143,16 @@ export function CompanyDisplay({
 
   // Mídia com erro: pula para o próximo; se for o único, mostra um aviso
   const handleMediaError = useCallback(() => {
+    const ad = adList[currentIndex];
+    if (ad) {
+      reportClientError(new Error(`Mídia não carregou: ${ad.title}`), {
+        source: "display",
+        context: { slug, adId: ad.id, type: ad.type, url: ad.content_url },
+      });
+    }
     if (adList.length > 1) goNext();
     else setFailed(true);
-  }, [adList.length, goNext]);
+  }, [adList, currentIndex, goNext, slug]);
 
   useEffect(() => {
     if (!failed) return;
