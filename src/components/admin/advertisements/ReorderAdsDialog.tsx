@@ -1,24 +1,32 @@
 // src/components/admin/advertisements/ReorderAdsDialog.tsx
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { reorderAdvertisements } from "@/actions/advertisements";
+import {
+  getAdvertisementOrder,
+  reorderAdvertisements,
+} from "@/actions/advertisements";
 import { Button } from "@/components/ui/Button/Button";
 import { Dialog } from "@/components/ui/Dialog/Dialog";
+import { Spinner } from "@/components/ui/Spinner/Spinner";
 import { useToast } from "@/components/ui/Toast/Toast";
-import type { AdvertisementWithCompanies } from "@/types";
+import type { OrderListAd } from "@/types";
 import { AdvertisementPreview } from "./AdvertisementPreview";
 import { ScheduleBadge } from "./ScheduleBadge";
 
 interface ReorderAdsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Na ordem atual de exibição */
-  ads: AdvertisementWithCompanies[];
+  /** Só os anúncios desta tela (página "Anúncios da empresa") */
+  companyId?: string;
 }
 
-export function ReorderAdsDialog({ open, onOpenChange, ads }: ReorderAdsDialogProps) {
+export function ReorderAdsDialog({
+  open,
+  onOpenChange,
+  companyId,
+}: ReorderAdsDialogProps) {
   return (
     <Dialog
       open={open}
@@ -28,16 +36,52 @@ export function ReorderAdsDialog({ open, onOpenChange, ads }: ReorderAdsDialogPr
       description="As telas mostram os anúncios nesta ordem, de cima para baixo. Anúncios novos entram no topo."
     >
       {/* Remonta a cada abertura para partir da ordem atual */}
-      {open && <ReorderList ads={ads} onDone={() => onOpenChange(false)} />}
+      {open && (
+        <ReorderLoader companyId={companyId} onDone={() => onOpenChange(false)} />
+      )}
     </Dialog>
   );
+}
+
+/** A lista da tela é paginada: aqui busca todos, na ordem atual. */
+function ReorderLoader({
+  companyId,
+  onDone,
+}: {
+  companyId?: string;
+  onDone: () => void;
+}) {
+  const [ads, setAds] = useState<OrderListAd[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getAdvertisementOrder(companyId).then((result) => {
+      if (!active) return;
+      if (result.success) setAds(result.ads);
+      else setError(result.message ?? "Não foi possível carregar a lista.");
+    });
+    return () => {
+      active = false;
+    };
+  }, [companyId]);
+
+  if (error) return <p className="text-sm text-destructive">{error}</p>;
+  if (!ads) {
+    return (
+      <div className="grid place-items-center py-10">
+        <Spinner />
+      </div>
+    );
+  }
+  return <ReorderList ads={ads} onDone={onDone} />;
 }
 
 function ReorderList({
   ads,
   onDone,
 }: {
-  ads: AdvertisementWithCompanies[];
+  ads: OrderListAd[];
   onDone: () => void;
 }) {
   const toast = useToast();

@@ -1,7 +1,8 @@
 // src/components/admin/advertisements/AdvertisementsClient.tsx
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowUpDown,
   Copy,
@@ -21,6 +22,7 @@ import {
 } from "@/actions/advertisements";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { PageHeader } from "@/components/admin/PageHeader";
+import { PaginationNav } from "@/components/admin/PaginationNav";
 import { RowActions } from "@/components/admin/RowActions";
 import { Badge } from "@/components/ui/Badge/Badge";
 import { Button } from "@/components/ui/Button/Button";
@@ -35,11 +37,10 @@ import {
   AD_SCHEDULE_LABEL,
   AD_TYPE_LABEL,
   getAdSchedule,
-  type AdSchedule,
 } from "@/lib/advertisement-display";
+import type { AdScheduleFilter } from "@/lib/advertisement-queries";
 import { formatWeeklySchedule } from "@/lib/ad-weekly-schedule";
 import { formatPeriod } from "@/lib/format";
-import { normalizeSearch } from "@/lib/search";
 import {
   AdvertisementStatus,
   AdvertisementWithCompanies,
@@ -52,7 +53,11 @@ import { ReorderAdsDialog } from "./ReorderAdsDialog";
 import { ScheduleBadge } from "./ScheduleBadge";
 
 interface AdvertisementsClientProps {
-  initialAdvertisements: AdvertisementWithCompanies[];
+  /** Página atual (a lista é paginada e filtrada no servidor) */
+  advertisements: AdvertisementWithCompanies[];
+  total: number;
+  perPage: number;
+  filters: { q: string; schedule: AdScheduleFilter; page: number };
   companies: Company[];
   title?: string;
   description?: string;
@@ -60,26 +65,35 @@ interface AdvertisementsClientProps {
   defaultCompanyId?: string;
 }
 
-const scheduleOptions = [
+// "Fora do horário" entra em "No ar" (dias/horários são aplicados na tela)
+const scheduleOptions: { value: AdScheduleFilter; label: string }[] = [
   { value: "all", label: "Todas as situações" },
-  ...(Object.keys(AD_SCHEDULE_LABEL) as AdSchedule[]).map((value) => ({
-    value,
-    label: AD_SCHEDULE_LABEL[value],
-  })),
+  { value: "live", label: AD_SCHEDULE_LABEL.live },
+  { value: "scheduled", label: AD_SCHEDULE_LABEL.scheduled },
+  { value: "expired", label: AD_SCHEDULE_LABEL.expired },
+  { value: "inactive", label: AD_SCHEDULE_LABEL.inactive },
 ];
 
+/** Espera o usuário parar de digitar antes de buscar no servidor. */
+const SEARCH_DEBOUNCE_MS = 400;
+
 export function AdvertisementsClient({
-  initialAdvertisements,
+  advertisements,
+  total,
+  perPage,
+  filters: current,
   companies,
   title = "Anúncios",
   description = "Crie, edite e agende o conteúdo das suas telas.",
   defaultCompanyId,
 }: AdvertisementsClientProps) {
   const toast = useToast();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [isNavigating, startNavigation] = useTransition();
 
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
-  const [query, setQuery] = useState("");
-  const [schedule, setSchedule] = useState<string>("all");
+  const [query, setQuery] = useState(current.q);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isReorderOpen, setIsReorderOpen] = useState(false);
   const [currentAd, setCurrentAd] = useState<AdvertisementWithCompanies | null>(
@@ -94,18 +108,31 @@ export function AdvertisementsClient({
     useState<AdvertisementWithCompanies | null>(null);
   const [isDeletePending, startDeleteTransition] = useTransition();
 
-  const filtered = useMemo(() => {
-    const q = normalizeSearch(query);
-    const now = new Date();
-    return initialAdvertisements.filter(
-      (ad) =>
-        (schedule === "all" || getAdSchedule(ad, now) === schedule) &&
-        (!q ||
-          normalizeSearch(
-            `${ad.title} ${ad.companies.map((c) => c.name).join(" ")}`
-          ).includes(q))
+  const filtered = advertisements;
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+  const hasFilters = !!current.q || current.schedule !== "all";
+
+  /** Filtros e página ficam na URL (o servidor busca a página certa). */
+  const navigate = (next: Partial<typeof current>) => {
+    const merged = { ...current, ...next };
+    const params = new URLSearchParams();
+    if (merged.q) params.set("q", merged.q);
+    if (merged.schedule !== "all") params.set("situacao", merged.schedule);
+    if (merged.page > 1) params.set("pagina", String(merged.page));
+    const qs = params.toString();
+    startNavigation(() => router.replace(qs ? `${pathname}?${qs}` : pathname));
+  };
+
+  // Busca enquanto digita (com pausa); volta para a página 1
+  useEffect(() => {
+    if (query.trim() === current.q) return;
+    const timer = setTimeout(
+      () => navigate({ q: query.trim(), page: 1 }),
+      SEARCH_DEBOUNCE_MS
     );
-  }, [initialAdvertisements, query, schedule]);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- navigate muda a cada render
+  }, [query, current.q]);
 
   const handleOpenModal = (
     ad: AdvertisementWithCompanies | null,
@@ -290,17 +317,30 @@ export function AdvertisementsClient({
         size="sm"
         aria-label="Filtrar por situação"
         options={scheduleOptions}
-        value={schedule}
-        onValueChange={(value) => setSchedule(value ?? "all")}
+        value={current.schedule}
+        onValueChange={(value) =>
+          navigate({
+            schedule: (value ?? "all") as AdScheduleFilter,
+            page: 1,
+          })
+        }
         containerClassName="w-48"
       />
     </div>
   );
 
-  const emptyMessage =
-    query || schedule !== "all"
-      ? "Nenhum anúncio encontrado com estes filtros."
-      : "Nenhum anúncio cadastrado ainda.";
+  const emptyMessage = hasFilters
+    ? "Nenhum anúncio encontrado com estes filtros."
+    : "Nenhum anúncio cadastrado ainda.";
+
+  const pagination = totalPages > 1 && (
+    <PaginationNav
+      page={current.page}
+      totalPages={totalPages}
+      onPageChange={(page) => navigate({ page })}
+      start={`${total} anúncio(s)`}
+    />
+  );
 
   return (
     <>
@@ -323,7 +363,7 @@ export function AdvertisementsClient({
               variant="secondary"
               leftIcon={<ArrowUpDown />}
               onClick={() => setIsReorderOpen(true)}
-              disabled={initialAdvertisements.length < 2}
+              disabled={!hasFilters && total < 2}
             >
               Ordem
             </Button>
@@ -359,7 +399,7 @@ export function AdvertisementsClient({
                 <Megaphone size={22} />
               </span>
               <p className="text-muted-foreground">{emptyMessage}</p>
-              {!query && schedule === "all" && (
+              {!hasFilters && (
                 <Button
                   leftIcon={<Plus />}
                   onClick={() => handleOpenModal(null)}
@@ -375,7 +415,7 @@ export function AdvertisementsClient({
           columns={columns}
           data={filtered}
           rowKey={(ad) => ad.id}
-          pageSize={10}
+          loading={isNavigating}
           selectable
           selected={selectedIds}
           onSelectedChange={setSelected}
@@ -416,10 +456,12 @@ export function AdvertisementsClient({
         />
       </Dialog>
 
+      {pagination}
+
       <ReorderAdsDialog
         open={isReorderOpen}
         onOpenChange={setIsReorderOpen}
-        ads={initialAdvertisements}
+        companyId={defaultCompanyId}
       />
 
       <ConfirmDialog

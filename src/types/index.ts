@@ -127,6 +127,22 @@ export type DisplayAd = Pick<
   | "daily_end"
 >;
 
+/** Anúncio no diálogo "Ordem" (lista completa, só o que a linha mostra). */
+export type OrderListAd = Pick<
+  Advertisement,
+  | "id"
+  | "title"
+  | "type"
+  | "content_url"
+  | "thumbnail_url"
+  | "status"
+  | "start_date"
+  | "end_date"
+  | "weekdays"
+  | "daily_start"
+  | "daily_end"
+>;
+
 /** Anúncio com as empresas vinculadas (resultado do join M:N). */
 export type AdvertisementWithCompanies = Advertisement & {
   companies: Company[];

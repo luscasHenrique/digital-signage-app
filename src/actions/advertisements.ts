@@ -3,6 +3,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAuthContext } from "@/lib/auth";
+import { ORDER_LIST_COLUMNS } from "@/lib/advertisement-queries";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   isHttpUrl,
@@ -21,6 +22,7 @@ import {
   AdvertisementStatus,
   AdvertisementType,
   OverlayPosition,
+  type OrderListAd,
 } from "@/types";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -475,4 +477,39 @@ export async function deleteAdvertisements(ids: string[]) {
     console.error("Erro ao excluir anúncios em lote:", error);
     return { success: false, message: "Não foi possível excluir os anúncios." };
   }
+}
+
+/** Lista completa na ordem de exibição (diálogo "Ordem"; a tela é paginada). */
+export async function getAdvertisementOrder(
+  companyId?: string
+): Promise<{ success: boolean; ads: OrderListAd[]; message?: string }> {
+  if (companyId && !z.string().uuid().safeParse(companyId).success) {
+    return { success: false, ads: [], message: "Empresa inválida." };
+  }
+  const ctx = await getAuthContext();
+  if (!ctx) return { success: false, ads: [], message: "Não autenticado." };
+
+  const select = companyId
+    ? `${ORDER_LIST_COLUMNS}, link:advertisements_companies!inner(company_id)`
+    : ORDER_LIST_COLUMNS;
+  let query = ctx.supabase
+    .from("advertisements")
+    .select(select)
+    .order("position", { ascending: true })
+    .order("created_at", { ascending: false })
+    .limit(1000);
+  if (companyId) query = query.eq("link.company_id", companyId);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("Erro ao carregar a ordem dos anúncios:", error);
+    return { success: false, ads: [], message: "Não foi possível carregar a lista." };
+  }
+  const rows = (data ?? []) as unknown as Record<string, unknown>[];
+  const ads = rows.map((row) => {
+    const ad = { ...row };
+    delete ad.link;
+    return ad as OrderListAd;
+  });
+  return { success: true, ads };
 }
