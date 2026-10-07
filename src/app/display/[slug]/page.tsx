@@ -2,6 +2,7 @@
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { CompanyDisplay } from "@/components/display/CompanyDisplay";
+import { DisplayError } from "@/components/display/DisplayError";
 import {
   getActiveAdsForCompany,
   getDisplayCompany,
@@ -34,11 +35,7 @@ export default async function DisplayPage({ params }: DisplayPageProps) {
     ads = await getActiveAdsForCompany(company.id);
   } catch (error) {
     console.error("Erro ao buscar anúncios:", error);
-    return (
-      <main className="h-screen w-screen bg-black grid place-items-center text-white">
-        Erro ao carregar anúncios.
-      </main>
-    );
+    return <DisplayError />;
   }
 
   // O player continua rodando mesmo sem anúncios, para exibir os que forem ativados depois.

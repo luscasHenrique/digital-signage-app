@@ -177,7 +177,8 @@ export async function createAdvertisement(data: ActionInput) {
       throw linkError;
     }
 
-    revalidatePath("/dashboard/anuncios");
+    // Lista geral, anúncios por empresa e contadores do dashboard
+    revalidatePath("/dashboard", "layout");
     return { success: true, message: "Anúncio criado com sucesso!" };
   } catch (error) {
     console.error("ERRO DETALHADO AO CRIAR ANÚNCIO:", error);
@@ -233,7 +234,8 @@ export async function updateAdvertisement(data: ActionInput) {
         : null,
     ]);
 
-    revalidatePath("/dashboard/anuncios");
+    // Lista geral, anúncios por empresa e contadores do dashboard
+    revalidatePath("/dashboard", "layout");
     return { success: true, message: "Anúncio atualizado com sucesso!" };
   } catch (error) {
     console.error("ERRO DETALHADO AO ATUALIZAR ANÚNCIO:", error);
@@ -270,7 +272,8 @@ export async function deleteAdvertisement(adId: string) {
     // Best-effort: remover arquivos do bucket
     await removeStorageFiles(supabase, [ad?.content_url, ad?.thumbnail_url]);
 
-    revalidatePath("/dashboard/anuncios");
+    // Lista geral, anúncios por empresa e contadores do dashboard
+    revalidatePath("/dashboard", "layout");
     return { success: true, message: "Anúncio deletado com sucesso!" };
   } catch (error) {
     console.error("ERRO DETALHADO AO DELETAR ANÚNCIO:", error);

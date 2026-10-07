@@ -85,6 +85,23 @@ export interface Advertisement {
   companies?: Company[];
 }
 
+/** Colunas que o player do display usa (evita trafegar o anúncio inteiro). */
+export const DISPLAY_AD_COLUMNS =
+  "id, title, type, content_url, duration_seconds, overlay_text, overlay_position, overlay_bg_color, overlay_text_color";
+
+export type DisplayAd = Pick<
+  Advertisement,
+  | "id"
+  | "title"
+  | "type"
+  | "content_url"
+  | "duration_seconds"
+  | "overlay_text"
+  | "overlay_position"
+  | "overlay_bg_color"
+  | "overlay_text_color"
+>;
+
 /** Anúncio com as empresas vinculadas (resultado do join M:N). */
 export type AdvertisementWithCompanies = Advertisement & {
   companies: Company[];

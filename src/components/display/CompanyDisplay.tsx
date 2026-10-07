@@ -7,7 +7,7 @@ import { getYoutubeEmbedUrl } from "@/lib/advertisement-display";
 import { isOptimizableImage } from "@/lib/storage";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeScope } from "@/components/ui/Theme/ThemeScope";
-import { Advertisement, AdvertisementType, OverlayPosition } from "@/types";
+import { AdvertisementType, OverlayPosition, type DisplayAd } from "@/types";
 import { DisplayClock } from "./DisplayClock";
 import { FullscreenButton } from "./FullscreenButton";
 import { useIdle, useWakeLock } from "./hooks";
@@ -16,13 +16,19 @@ import styles from "./CompanyDisplay.module.css";
 type AnimationType = "fade" | "slideFromRight" | "zoomIn";
 
 interface CompanyDisplayProps {
-  ads: Advertisement[];
+  ads: DisplayAd[];
   animationType?: AnimationType;
   companyId: string;
   slug: string;
 }
 
 const REFRESH_INTERVAL_MS = 30_000;
+/** Intervalo máximo entre tentativas quando o servidor não responde. */
+const MAX_REFRESH_INTERVAL_MS = 5 * 60_000;
+/** Depois de um erro de mídia com um único anúncio, tenta carregar de novo. */
+const MEDIA_RETRY_MS = 60_000;
+/** Limite para vídeos longos (ou que nunca disparam `ended`). */
+const MAX_VIDEO_MS = 5 * 60_000;
 const DEFAULT_DURATION_SECONDS = 10;
 /** Tempo da animação de troca (precisa bater com o CSS). */
 const TRANSITION_MS = 1000;
@@ -33,10 +39,15 @@ export function CompanyDisplay({
   companyId,
   slug,
 }: CompanyDisplayProps) {
-  const [adList, setAdList] = useState<Advertisement[]>(ads);
+  const [adList, setAdList] = useState<DisplayAd[]>(ads);
   const [currentIndex, setCurrentIndex] = useState(0);
   // Slide que está saindo: fica na tela durante a animação de troca
-  const [leaving, setLeaving] = useState<Advertisement | null>(null);
+  const [leaving, setLeaving] = useState<DisplayAd | null>(null);
+  // Mídia do único anúncio falhou: mostra aviso e tenta de novo depois
+  const [failed, setFailed] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+  // Vídeos tocam até o fim, mas só avançam depois da duração mínima
+  const minElapsedRef = useRef(false);
   const supabase = useMemo(() => createClient(), []);
   const idle = useIdle(3000);
   useWakeLock();
@@ -47,7 +58,9 @@ export function CompanyDisplay({
     setCurrentIndex(0);
   }, [ads]);
 
-  const currentAd = adList[currentIndex] as Advertisement | undefined;
+  useEffect(() => setFailed(false), [adList]);
+
+  const currentAd = adList[currentIndex] as DisplayAd | undefined;
   const nextAd =
     adList.length > 1 ? adList[(currentIndex + 1) % adList.length] : undefined;
 
@@ -57,14 +70,50 @@ export function CompanyDisplay({
     setCurrentIndex((prev) => (prev + 1) % adList.length);
   }, [adList, currentIndex]);
 
-  // Slideshow: cada anúncio fica pelo tempo configurado
+  // Slideshow: cada anúncio fica pelo tempo configurado. Vídeos não são
+  // cortados no meio: a duração vira o tempo mínimo e a troca acontece no fim.
   useEffect(() => {
+    minElapsedRef.current = false;
     if (adList.length <= 1) return;
-    const seconds =
-      adList[currentIndex]?.duration_seconds || DEFAULT_DURATION_SECONDS;
-    const timer = setTimeout(goNext, seconds * 1000);
+    const ad = adList[currentIndex];
+    const ms = (ad?.duration_seconds || DEFAULT_DURATION_SECONDS) * 1000;
+
+    if (ad && isVideo(ad)) {
+      const minTimer = setTimeout(() => (minElapsedRef.current = true), ms);
+      const maxTimer = setTimeout(goNext, Math.max(ms, MAX_VIDEO_MS));
+      return () => {
+        clearTimeout(minTimer);
+        clearTimeout(maxTimer);
+      };
+    }
+
+    const timer = setTimeout(goNext, ms);
     return () => clearTimeout(timer);
   }, [adList, currentIndex, goNext]);
+
+  /** Fim do vídeo: avança se já cumpriu a duração; senão o vídeo recomeça. */
+  const handleVideoEnded = useCallback(() => {
+    if (adList.length > 1 && minElapsedRef.current) {
+      goNext();
+      return true;
+    }
+    return false;
+  }, [adList.length, goNext]);
+
+  // Mídia com erro: pula para o próximo; se for o único, mostra um aviso
+  const handleMediaError = useCallback(() => {
+    if (adList.length > 1) goNext();
+    else setFailed(true);
+  }, [adList.length, goNext]);
+
+  useEffect(() => {
+    if (!failed) return;
+    const timer = setTimeout(() => {
+      setFailed(false);
+      setRetryKey((k) => k + 1);
+    }, MEDIA_RETRY_MS);
+    return () => clearTimeout(timer);
+  }, [failed]);
 
   // Remove o slide anterior quando a animação termina
   useEffect(() => {
@@ -74,28 +123,37 @@ export function CompanyDisplay({
   }, [leaving]);
 
   // ---- Refetch (a API do servidor valida o acesso) + Realtime ----
-  const refetch = useCallback(async () => {
+  // ETag da última resposta: se nada mudou, o servidor responde 304 sem corpo.
+  const etagRef = useRef<string | null>(null);
+
+  /** Retorna false quando a requisição falha (para espaçar as tentativas). */
+  const refetch = useCallback(async (): Promise<boolean> => {
     try {
       const res = await fetch(`/api/display/${encodeURIComponent(slug)}`, {
         cache: "no-store",
+        headers: etagRef.current ? { "If-None-Match": etagRef.current } : {},
       });
 
       // Senha trocada ou acesso expirado: volta para a tela de senha.
       if (res.status === 401) {
         window.location.href = `/display/${slug}/auth`;
-        return;
+        return true;
       }
+      if (res.status === 304) return true;
       if (!res.ok) {
         console.error("Erro ao buscar anúncios:", res.status);
-        return;
+        return false;
       }
 
-      const { ads: list } = (await res.json()) as { ads: Advertisement[] };
+      etagRef.current = res.headers.get("ETag");
+      const { ads: list } = (await res.json()) as { ads: DisplayAd[] };
       setAdList((current) => (sameAds(current, list) ? current : list));
       setCurrentIndex((prev) => (list.length > 0 ? prev % list.length : 0));
+      return true;
     } catch (error) {
       // Falha de rede: mantém a lista atual na tela.
       console.error("Erro ao buscar anúncios:", error);
+      return false;
     }
   }, [slug]);
 
@@ -134,9 +192,37 @@ export function CompanyDisplay({
   }, [supabase, companyId, debouncedRefetch]);
 
   // Refetch periódico: cobre a janela de datas (start/end) e falhas do Realtime.
+  // Pausa com a aba oculta e espaça as tentativas enquanto o servidor falha.
   useEffect(() => {
-    const id = setInterval(refetch, REFRESH_INTERVAL_MS);
-    return () => clearInterval(id);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let delay = REFRESH_INTERVAL_MS;
+    let stopped = false;
+
+    const schedule = () => {
+      clearTimeout(timer);
+      if (stopped || document.visibilityState !== "visible") return;
+      timer = setTimeout(async () => {
+        const ok = await refetch();
+        delay = ok
+          ? REFRESH_INTERVAL_MS
+          : Math.min(delay * 2, MAX_REFRESH_INTERVAL_MS);
+        schedule();
+      }, delay);
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      void refetch();
+      schedule();
+    };
+
+    schedule();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [refetch]);
 
   return (
@@ -146,29 +232,35 @@ export function CompanyDisplay({
         className={styles.screen}
         data-idle={idle || undefined}
       >
-        {currentAd ? (
+        {currentAd && failed ? (
+          <p className={styles.empty}>Conteúdo indisponível no momento.</p>
+        ) : currentAd ? (
           <>
             {/* Mesma key (id) do slide que estava na tela: o React reaproveita o
                 elemento, e vídeo/iframe não recarregam durante a saída */}
             {leaving && leaving.id !== currentAd.id && (
               <Slide
-                key={leaving.id}
+                key={`${leaving.id}-${retryKey}`}
                 ad={leaving}
                 phase="exit"
                 animation={animationType}
               />
             )}
             <Slide
-              key={currentAd.id}
+              key={`${currentAd.id}-${retryKey}`}
               ad={currentAd}
               phase={leaving ? "enter" : "idle"}
               animation={animationType}
-              onError={goNext}
+              onError={handleMediaError}
+              onVideoEnded={handleVideoEnded}
             />
-            {/* Carrega a próxima imagem antes da troca (evita tela preta) */}
-            {nextAd && isImage(nextAd) && nextAd.id !== currentAd.id && (
+            {/* Carrega a próxima mídia antes da troca (evita tela preta) */}
+            {nextAd && nextAd.id !== currentAd.id && (
               <div className={styles.preload} aria-hidden="true">
-                <AdImage ad={nextAd} />
+                {isImage(nextAd) && <AdImage ad={nextAd} />}
+                {isVideo(nextAd) && (
+                  <video src={nextAd.content_url} preload="auto" muted />
+                )}
               </div>
             )}
           </>
@@ -191,11 +283,13 @@ function Slide({
   phase,
   animation,
   onError,
+  onVideoEnded,
 }: {
-  ad: Advertisement;
+  ad: DisplayAd;
   phase: "enter" | "exit" | "idle";
   animation: AnimationType;
   onError?: () => void;
+  onVideoEnded?: () => boolean;
 }) {
   return (
     <div
@@ -204,7 +298,12 @@ function Slide({
       data-animation={animation}
       aria-hidden={phase === "exit" || undefined}
     >
-      <AdContent ad={ad} active={phase !== "exit"} onError={onError} />
+      <AdContent
+        ad={ad}
+        active={phase !== "exit"}
+        onError={onError}
+        onVideoEnded={onVideoEnded}
+      />
 
       {ad.overlay_text && (
         <div
@@ -224,14 +323,21 @@ function Slide({
   );
 }
 
-function isImage(ad: Advertisement) {
+function isImage(ad: DisplayAd) {
   return (
     ad.type === AdvertisementType.IMAGE_UPLOAD ||
     ad.type === AdvertisementType.IMAGE_LINK
   );
 }
 
-function AdImage({ ad, onError }: { ad: Advertisement; onError?: () => void }) {
+function isVideo(ad: DisplayAd) {
+  return (
+    ad.type === AdvertisementType.VIDEO_UPLOAD ||
+    ad.type === AdvertisementType.VIDEO_LINK
+  );
+}
+
+function AdImage({ ad, onError }: { ad: DisplayAd; onError?: () => void }) {
   return (
     <Image
       src={ad.content_url}
@@ -250,10 +356,13 @@ function AdContent({
   ad,
   active,
   onError,
+  onVideoEnded,
 }: {
-  ad: Advertisement;
+  ad: DisplayAd;
   active: boolean;
   onError?: () => void;
+  /** Retorna true se o player avançou; senão o vídeo recomeça. */
+  onVideoEnded?: () => boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -268,20 +377,22 @@ function AdContent({
 
   if (isImage(ad)) return <AdImage ad={ad} onError={onError} />;
 
-  if (
-    ad.type === AdvertisementType.VIDEO_UPLOAD ||
-    ad.type === AdvertisementType.VIDEO_LINK
-  ) {
+  if (isVideo(ad)) {
     return (
       <video
         ref={videoRef}
         src={ad.content_url}
         muted
         autoPlay
-        loop
         playsInline
         className="size-full object-cover"
         onError={onError}
+        onEnded={(e) => {
+          if (onVideoEnded?.()) return;
+          const video = e.currentTarget;
+          video.currentTime = 0;
+          void video.play().catch(() => {});
+        }}
       />
     );
   }
@@ -302,6 +413,6 @@ function AdContent({
 }
 
 /** Evita reiniciar o slideshow quando o refetch traz exatamente os mesmos anúncios. */
-function sameAds(a: Advertisement[], b: Advertisement[]) {
+function sameAds(a: DisplayAd[], b: DisplayAd[]) {
   return a.length === b.length && JSON.stringify(a) === JSON.stringify(b);
 }

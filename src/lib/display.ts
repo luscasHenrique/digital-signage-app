@@ -4,7 +4,7 @@ import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { passwordFingerprint } from "@/lib/password";
 import { verifyDisplayToken } from "@/lib/display-token";
-import { Advertisement, AdvertisementStatus } from "@/types";
+import { AdvertisementStatus, DISPLAY_AD_COLUMNS, type DisplayAd } from "@/types";
 
 // Dados de display são lidos com service role para que as tabelas
 // não precisem de leitura pública (anon) no RLS. O acesso é decidido aqui.
@@ -42,29 +42,28 @@ export async function hasDisplayAccess(
   );
 }
 
-/** Anúncios ativos e dentro da janela de exibição para a empresa. */
+/**
+ * Anúncios ativos e dentro da janela de exibição para a empresa.
+ * Uma consulta só: o vínculo com a empresa entra como inner join de filtro.
+ */
 export async function getActiveAdsForCompany(
   companyId: string
-): Promise<Advertisement[]> {
-  const { data: links, error: linkErr } = await supabaseAdmin
-    .from("advertisements_companies")
-    .select("advertisement_id")
-    .eq("company_id", companyId);
-  if (linkErr) throw linkErr;
-
-  const ids = (links ?? []).map((l) => l.advertisement_id as string);
-  if (ids.length === 0) return [];
-
+): Promise<DisplayAd[]> {
   const nowIso = new Date().toISOString();
-  const { data: ads, error: adsErr } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("advertisements")
-    .select("*")
-    .in("id", ids)
+    .select(`${DISPLAY_AD_COLUMNS}, link:advertisements_companies!inner(company_id)`)
+    .eq("link.company_id", companyId)
     .eq("status", AdvertisementStatus.ACTIVE)
     .lte("start_date", nowIso)
     .gte("end_date", nowIso)
     .order("created_at", { ascending: false });
-  if (adsErr) throw adsErr;
+  if (error) throw error;
 
-  return (ads ?? []) as Advertisement[];
+  // `link` só serve de filtro; o player não precisa dele
+  return (data ?? []).map((row) => {
+    const ad: Record<string, unknown> = { ...row };
+    delete ad.link;
+    return ad as DisplayAd;
+  });
 }

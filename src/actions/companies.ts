@@ -50,7 +50,8 @@ export async function createCompany(
     });
     if (error) throw error;
 
-    revalidatePath("/dashboard/empresas");
+    // Lista de empresas, filtros de anúncios e contadores do dashboard
+    revalidatePath("/dashboard", "layout");
     return { success: true, message: "Empresa criada com sucesso!" };
   } catch (error) {
     console.error("ERRO AO CRIAR EMPRESA:", error);
@@ -110,7 +111,8 @@ export async function updateCompany(
       .eq("id", id);
     if (error) throw error;
 
-    revalidatePath("/dashboard/empresas");
+    // Lista de empresas, filtros de anúncios e contadores do dashboard
+    revalidatePath("/dashboard", "layout");
     return { success: true, message: "Empresa atualizada com sucesso!" };
   } catch (error) {
     console.error("ERRO AO ATUALIZAR EMPRESA:", error);
@@ -140,7 +142,8 @@ export async function deleteCompany(
       .eq("id", companyId);
     if (error) throw error;
 
-    revalidatePath("/dashboard/empresas");
+    // Lista de empresas, filtros de anúncios e contadores do dashboard
+    revalidatePath("/dashboard", "layout");
     return { success: true, message: "Empresa deletada com sucesso!" };
   } catch (error) {
     console.error("ERRO AO DELETAR EMPRESA:", error);
