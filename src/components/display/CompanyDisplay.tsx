@@ -11,7 +11,13 @@ import { ThemeScope } from "@/components/ui/Theme/ThemeScope";
 import { AdvertisementType, OverlayPosition, type DisplayAd } from "@/types";
 import { DisplayClock } from "./DisplayClock";
 import { FullscreenButton } from "./FullscreenButton";
-import { useIdle, useOfflineSupport, useWakeLock } from "./hooks";
+import {
+  useIdle,
+  useOfflineSupport,
+  usePlayStatsFlush,
+  useWakeLock,
+} from "./hooks";
+import { addPlay, loadCounts, saveCounts } from "./play-counter";
 import styles from "./CompanyDisplay.module.css";
 
 type AnimationType = "fade" | "slideFromRight" | "zoomIn";
@@ -58,6 +64,9 @@ export function CompanyDisplay({
   const idle = useIdle(3000);
   useWakeLock();
   useOfflineSupport(slug);
+  usePlayStatsFlush(slug);
+  // Com um único anúncio na tela, conta uma exibição a cada "duração"
+  const [playCycle, setPlayCycle] = useState(0);
 
   // Se o servidor mandar novos `ads`, ressincroniza
   useEffect(() => {
@@ -94,9 +103,13 @@ export function CompanyDisplay({
   // cortados no meio: a duração vira o tempo mínimo e a troca acontece no fim.
   useEffect(() => {
     minElapsedRef.current = false;
-    if (adList.length <= 1) return;
     const ad = adList[currentIndex];
     const ms = (ad?.duration_seconds || DEFAULT_DURATION_SECONDS) * 1000;
+    if (adList.length === 1) {
+      const id = setInterval(() => setPlayCycle((c) => c + 1), ms);
+      return () => clearInterval(id);
+    }
+    if (adList.length === 0) return;
 
     if (ad && isVideo(ad)) {
       const minTimer = setTimeout(() => (minElapsedRef.current = true), ms);
@@ -110,6 +123,13 @@ export function CompanyDisplay({
     const timer = setTimeout(goNext, ms);
     return () => clearTimeout(timer);
   }, [adList, currentIndex, goNext]);
+
+  // Relatório: cada anúncio que entra na tela conta uma exibição
+  const currentAdId = adList[currentIndex]?.id;
+  useEffect(() => {
+    if (!currentAdId || failed) return;
+    saveCounts(slug, addPlay(loadCounts(slug), currentAdId, new Date()));
+  }, [slug, currentAdId, currentIndex, playCycle, failed]);
 
   /** Fim do vídeo: avança se já cumpriu a duração; senão o vídeo recomeça. */
   const handleVideoEnded = useCallback(() => {

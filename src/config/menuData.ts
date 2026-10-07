@@ -1,5 +1,12 @@
 // src/config/menuData.ts
-import { Home, Megaphone, Building2, Settings, UserRound } from "lucide-react";
+import {
+  BarChart3,
+  Building2,
+  Home,
+  Megaphone,
+  Settings,
+  UserRound,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { UserRole } from "@/types";
 
@@ -26,6 +33,12 @@ export const menuData: MenuItem[] = [
     href: "/dashboard/empresas",
     label: "Empresas",
     icon: Building2,
+  },
+  {
+    id: "relatorios",
+    href: "/dashboard/relatorios",
+    label: "Relatórios",
+    icon: BarChart3,
   },
   {
     id: "admin",

@@ -5,6 +5,51 @@ export type Json = string | number | boolean | null | {
 export type Database = {
   "public": {
     Tables: {
+      "ad_play_stats": {
+        Row: {
+          "advertisement_id": string;
+          "company_id": string;
+          "day": string;
+          "plays": number;
+        };
+        ComputedFields: never;
+        Insert: {
+          "advertisement_id": string;
+          "company_id": string;
+          "day": string;
+          "plays"?: number;
+        };
+        Update: {
+          "advertisement_id"?: string;
+          "company_id"?: string;
+          "day"?: string;
+          "plays"?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ad_play_stats_advertisement_id_fkey";
+            columns: [
+              "advertisement_id"
+            ];
+            isOneToOne: false;
+            referencedRelation: "advertisements";
+            referencedColumns: [
+              "id"
+            ];
+          },
+          {
+            foreignKeyName: "ad_play_stats_company_id_fkey";
+            columns: [
+              "company_id"
+            ];
+            isOneToOne: false;
+            referencedRelation: "companies";
+            referencedColumns: [
+              "id"
+            ];
+          }
+        ];
+      };
       "advertisements": {
         Row: {
           "content_url": string;
@@ -317,6 +362,13 @@ export type Database = {
           "uid": string;
         };
         Returns: boolean;
+      };
+      "record_ad_plays": {
+        Args: {
+          "p_company_id": string;
+          "p_items": Json;
+        };
+        Returns: undefined;
       };
       "reorder_advertisements": {
         Args: {

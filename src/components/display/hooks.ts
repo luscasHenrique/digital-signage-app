@@ -2,6 +2,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  loadCounts,
+  saveCounts,
+  subtractSent,
+  toPayload,
+} from "./play-counter";
 
 /** true quando o mouse/teclado fica parado por `timeoutMs`. */
 export function useIdle(timeoutMs: number): boolean {
@@ -24,6 +30,54 @@ export function useIdle(timeoutMs: number): boolean {
   }, [timeoutMs]);
 
   return idle;
+}
+
+const PLAYS_FLUSH_MS = 5 * 60_000;
+
+/**
+ * Envia a contagem de exibições (relatório) a cada 5 min e ao sair da página.
+ * O que não for enviado fica guardado e vai na próxima vez.
+ */
+export function usePlayStatsFlush(slug: string) {
+  useEffect(() => {
+    let sending = false;
+
+    const flush = async () => {
+      const counts = loadCounts(slug);
+      const items = toPayload(counts);
+      if (sending || items.length === 0) return;
+      sending = true;
+      try {
+        const res = await fetch(
+          `/api/display/${encodeURIComponent(slug)}/plays`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items }),
+            // Continua mesmo se a página estiver sendo fechada
+            keepalive: true,
+          }
+        );
+        if (res.ok) saveCounts(slug, subtractSent(loadCounts(slug), counts));
+      } catch {
+        // Sem rede: tenta de novo no próximo ciclo
+      } finally {
+        sending = false;
+      }
+    };
+
+    const id = setInterval(flush, PLAYS_FLUSH_MS);
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") void flush();
+    };
+    document.addEventListener("visibilitychange", onHidden);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onHidden);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [slug]);
 }
 
 /**
