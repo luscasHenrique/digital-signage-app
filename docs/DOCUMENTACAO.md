@@ -1,22 +1,32 @@
 # Digital Signage App — Documentação
 
-> Primeira versão: varredura do código em 2026-10-06 (commit `76cf66e`). Atualizada no mesmo dia após as correções de segurança e bugs (seção 10) e após a adoção do design system **Liquid Glass** (seção 5).
-> Este repositório só passou a ter SQL do banco com a migração [supabase/migrations/20261006000000_security_hardening.sql](../supabase/migrations/20261006000000_security_hardening.sql). As tabelas, as políticas RLS e os triggers anteriores continuam fora do repositório. Por isso, o modelo de dados abaixo foi **deduzido do código** e precisa ser confirmado no Supabase.
+> Primeira versão em 2026-10-06 (commit `76cf66e`). Atualizada em 2026-10-07 com:
+> - o schema do banco versionado;
+> - o ambiente local;
+> - o modo offline das TVs;
+> - o status das telas;
+> - a ordem e a programação semanal dos anúncios;
+> - o relatório de exibição;
+> - a recuperação de senha;
+> - os testes de ponta a ponta.
+>
+> O modelo de dados (seção 7) agora vem do schema real, em [supabase/migrations/](../supabase/migrations/).
 
 ---
 
 ## 1. Visão geral
 
-Plataforma de **sinalização digital (digital signage)**. Usuários cadastram **anúncios** (imagens, vídeos ou embeds do YouTube) em um painel administrativo e os vinculam a **empresas**. Cada empresa tem uma página de exibição (`/display/<slug>`) feita para rodar em tela cheia em TVs e monitores. A página troca os anúncios automaticamente, mostra um relógio e se atualiza sozinha.
+Plataforma de **sinalização digital (digital signage)**. No painel, os usuários cadastram **anúncios** (imagens, vídeos ou YouTube) e os vinculam a **empresas**. Cada empresa tem uma página de exibição (`/display/<slug>`) feita para rodar em tela cheia em TVs. A página troca os anúncios sozinha, continua funcionando sem internet e avisa o painel de que está no ar.
 
 | Área | O que faz |
 |---|---|
-| Login | Autenticação por e-mail/senha (Supabase Auth) |
-| Anúncios | CRUD; upload de arquivo para o Storage ou link externo; agendamento (início/fim); duração por slide; status ativo/inativo; texto sobreposto (overlay) com cores e posição; vínculo com N empresas |
-| Empresas | CRUD; slug único; opção de página **privada** protegida por senha |
-| Display | Slideshow em tela cheia por empresa, atualizado por Realtime e por consulta a cada 30 s |
-| Usuários (só ADMIN) | CRUD de usuários com papéis `ADMIN` / `STANDARD` |
-| Auditoria (só ADMIN) | Lista paginada e filtrável da tabela `audit_logs`, que é preenchida por triggers no banco |
+| Login | E-mail e senha (Supabase Auth); "Esqueci minha senha" por e-mail; página **Minha conta** (nome e senha) |
+| Anúncios | Cadastro com upload para o Storage (imagens reduzidas no navegador) ou link externo, além de:<br>• período (início/fim), **dias da semana e faixa de horário**, duração por slide;<br>• status ativo/inativo e texto sobreposto;<br>• vínculo com N empresas;<br>• **ordem de exibição**, **duplicar** e **ações em lote** (ativar, desativar, excluir) |
+| Empresas | Cadastro com slug único, página **privada** com senha opcional e **transição** do player; mostra o **status da TV** ("No ar", "Sem sinal há X", "Nunca abriu") |
+| Display | Slideshow em tela cheia, atualizado por Realtime e por consulta a cada 30 s. Funciona **offline** (service worker) e conta as exibições |
+| Relatórios | Exibições e tempo de tela por anúncio e por tela, num período |
+| Usuários (só ADMIN) | Cadastro de usuários com papéis `ADMIN` / `STANDARD` |
+| Auditoria (só ADMIN) | Histórico de `audit_logs` (anúncios, empresas e perfis), preenchido por triggers |
 
 ---
 
@@ -25,12 +35,14 @@ Plataforma de **sinalização digital (digital signage)**. Usuários cadastram *
 | Camada | Tecnologia |
 |---|---|
 | Framework | Next.js **15.5.27** (App Router, Server Components, Server Actions, Route Handlers) |
-| UI | React 19.1, design system **Liquid Glass** (CSS Modules, sem dependências), Tailwind CSS 4 só para layout, lucide-react |
+| UI | React 19.1, design system **Liquid Glass** (CSS Modules), Tailwind CSS 4 só para layout, lucide-react |
 | Formulários | react-hook-form + zod 4 |
-| Animações | CSS puro (transições do display) e as animações do próprio design system |
-| Backend | Supabase (Postgres, Auth, Storage, Realtime) via `@supabase/ssr` e `@supabase/supabase-js` |
-| Segurança | `jose` (JWT HS256 do display privado), `node:crypto` scrypt (hash das senhas de empresa) |
-| Testes | Vitest |
+| Backend | Supabase (Postgres, Auth, Storage, Realtime) via `@supabase/ssr` e `@supabase/supabase-js`, com tipos gerados do schema (`src/types/database.ts`) |
+| Segurança | `jose` (JWT do display privado), scrypt (`node:crypto`) nas senhas de empresa, CSP e headers de segurança |
+| Offline | Service worker próprio (`public/sw-display.js`), sem bibliotecas |
+| Testes | Vitest (unitários) e Playwright (ponta a ponta, contra o Supabase local) |
+| CI | GitHub Actions: lint, `tsc`, Vitest e build em cada push e PR |
+| Agendamento | Vercel Cron (limpeza diária de uploads órfãos) |
 
 ---
 
@@ -38,24 +50,53 @@ Plataforma de **sinalização digital (digital signage)**. Usuários cadastram *
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
-npm test         # testes automatizados (Vitest)
+npm run dev        # http://localhost:3000
+npm test           # testes unitários (Vitest)
+npm run test:e2e   # ponta a ponta (Playwright; precisa do Supabase local)
 npm run lint
+npm run db:types   # regera src/types/database.ts a partir do Supabase local
 npm run build && npm run start
 ```
 
-### Variáveis de ambiente (`.env.local`)
+### Variáveis de ambiente
 
 | Variável | Uso | Vai para o navegador? |
 |---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | URL do projeto Supabase. Também define o host liberado para imagens em `next.config.ts` | Sim |
+| `NEXT_PUBLIC_SUPABASE_URL` | URL do Supabase. Também define o host liberado em imagens e na CSP | Sim |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Chave anônima, sujeita a RLS | Sim |
 | `SUPABASE_SERVICE_ROLE_KEY` | Chave de serviço, que **ignora a RLS**. Só é usada no servidor (`server-only`) | Não |
-| `JWT_SECRET_KEY` | Segredo usado para assinar o cookie de acesso aos displays privados | Não |
+| `JWT_SECRET_KEY` | Assina o cookie de acesso aos displays privados | Não |
+| `CRON_SECRET` | Protege `/api/cron/cleanup-uploads`. Sem ela, a limpeza diária não roda | Não |
+| `NEXT_PUBLIC_SITE_URL` | Opcional. Endereço usado nos links de e-mail; sem ela, usa o host da requisição | Sim |
 
-### Banco de dados
+### Banco local (recomendado para desenvolver)
 
-Aplique a migração [supabase/migrations/20261006000000_security_hardening.sql](../supabase/migrations/20261006000000_security_hardening.sql) **depois** de publicar o código. Use o SQL Editor do Supabase ou `supabase db push`. A seção 7 explica o que ela faz.
+O `.env.local` aponta para a **produção**. Para testar sem mexer em dados reais, abra o Docker Desktop e rode:
+
+```bash
+npx supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta
+npx supabase db reset   # aplica as migrações e o seed
+```
+
+Crie um `.env.development.local` com a URL `http://127.0.0.1:54321` e as chaves mostradas pelo `supabase start`. No `npm run dev`, esse arquivo tem prioridade sobre o `.env.local`. O seed (`supabase/seed.sql`, que nunca vai para produção) cria:
+- os usuários `admin@local.test` (ADMIN) e `standard@local.test` (STANDARD), com a senha `Senha-local-123`;
+- as telas `loja-centro` (pública) e `loja-privada` (senha `1234`);
+- três anúncios.
+
+### Migrações
+
+As migrações ficam em `supabase/migrations/` e são aplicadas em produção com `npx supabase db push --linked`. A `20251001000000_baseline_schema.sql` é o dump do schema de produção. Ela só serve para recriar o banco do zero e, em produção, deve ser marcada como já aplicada com `npx supabase migration repair --status applied 20251001000000`.
+
+| Migração | Conteúdo | Produção |
+|---|---|---|
+| `20251001000000_baseline_schema` | Tabelas, funções, triggers, RLS, bucket e Realtime de produção | Marcar como aplicada |
+| `20261006000000_security_hardening` | `display_signals`, anon sem acesso, `password` ilegível, `role` protegido, limites do bucket | ✅ Aplicada |
+| `20261006120000_rate_limit_and_indexes` | Limite de tentativas no banco + índices | ⏳ Pendente |
+| `20261007000000_policies_cleanup_and_status_fix` | `profiles` fechado para visitantes, políticas antigas removidas, `audit_logs` só por trigger, status manual (remove o trigger e o job que reativavam anúncios), auditoria de empresas | ⏳ Pendente |
+| `20261007120000_display_features` | `position`, `weekdays`/`daily_start`/`daily_end`, `companies.transition`, `display_heartbeats` | ⏳ Pendente |
+| `20261007180000_play_stats` | `ad_play_stats` + `record_ad_plays` | ⏳ Pendente |
+
+> **Ordem de publicação:** aplicar as migrações **antes** de publicar o código. A partir do commit `6e5d228`, o código usa colunas e tabelas que só existem depois delas.
 
 ---
 
@@ -64,63 +105,53 @@ Aplique a migração [supabase/migrations/20261006000000_security_hardening.sql]
 ```
 src/
 ├── middleware.ts              # Renova a sessão e exige login em /dashboard
-├── actions/                   # Server Actions (alterações de dados)
-│   ├── auth.ts                # login, logout
-│   ├── advertisements.ts      # CRUD de anúncios, getSignedUploadUrl
-│   ├── companies.ts           # CRUD de empresas, verifyCompanyPassword
-│   └── users.ts               # CRUD de usuários (só ADMIN; usa service role)
+├── actions/                   # Server Actions
+│   ├── auth.ts                # login (com limite de tentativas), logout
+│   ├── account.ts             # esqueci a senha, trocar nome/senha
+│   ├── advertisements.ts      # CRUD, ordem, lote, upload assinado
+│   ├── companies.ts           # CRUD, senha do display privado
+│   └── users.ts               # CRUD de usuários (só ADMIN; service role)
 ├── app/
-│   ├── (public)/              # "/" e "/login"
-│   ├── (admin)/               # Painel (/dashboard/...)
-│   ├── display/[slug]/        # Player e /auth (senha)
-│   └── api/display/[slug]/    # GET com os anúncios ativos (usado pelo player)
+│   ├── (public)/              # "/", "/login", "/recuperar-senha"
+│   ├── (admin)/dashboard/     # Painel, incluindo relatorios/ e conta/
+│   ├── display/[slug]/        # Player, /auth (senha) e error.tsx (recarrega sozinho)
+│   ├── api/display/[slug]/    # GET anúncios (ETag) e POST plays (contagem)
+│   ├── api/cron/              # Limpeza diária de uploads órfãos
+│   ├── auth/callback/         # Retorno dos links de e-mail
+│   ├── robots.ts, manifest.ts
 ├── components/
-│   ├── admin/                 # Telas do painel
-│   ├── auth/                  # LoginForm, PasswordForm
-│   ├── display/               # CompanyDisplay (player)
-│   ├── ButtonLink.tsx         # Link do Next com a aparência do Button
-│   └── ui/                    # Design system Liquid Glass (não editar aqui; ver seção 5)
-├── config/menuData.ts         # Menu lateral (itens com restrição de papel)
-├── styles/                    # Tokens, reset e vidro do Liquid Glass
+│   ├── admin/                 # Telas do painel (advertisements/form/ tem as seções do formulário)
+│   ├── auth/                  # LoginForm, ForgotPasswordForm, PasswordForm
+│   ├── display/               # Player, hooks (wake lock, offline, contagem), play-counter
+│   └── ui/                    # Design system Liquid Glass (não editar; ver seção 5)
 ├── lib/
-│   ├── auth.ts                # getAuthContext() e requireAdminPage()
-│   ├── display.ts             # Dados e controle de acesso do display (service role)
-│   ├── display-token.ts       # Emissão e validação do JWT do display privado
-│   ├── password.ts            # Hash (scrypt) e verificação das senhas de empresa
-│   ├── rate-limit.ts          # Limite de tentativas em memória
-│   ├── storage.ts             # Regras do bucket (tipos e tamanhos), helpers de URL
-│   ├── advertisement-links.ts # Diferença entre os vínculos atuais e os desejados
-│   ├── advertisement-display.ts # Situação do anúncio (no ar, agendado...), YouTube, início/fim do dia
-│   ├── audit-format.ts        # Textos da auditoria (resumo, alterações, senha mascarada)
-│   ├── form-errors.ts         # Erros das actions → campos do formulário / toast
-│   ├── schemas.ts             # Schemas zod usados pelos formulários e pelas actions
-│   └── supabase/              # Clientes: navegador, servidor e admin
-└── types/                     # Enums, interfaces e helpers da auditoria
-tests/                         # Testes Vitest e helpers (Supabase simulado)
-supabase/migrations/           # SQL versionado
+│   ├── ad-weekly-schedule.ts  # Dias/horários (horário de Brasília)
+│   ├── display.ts             # Dados, acesso e heartbeat do display (service role)
+│   ├── display-status.ts      # "No ar" / "Sem sinal" a partir do último contato
+│   ├── image-optimize.ts      # Reduz imagens no navegador antes do upload
+│   ├── play-report.ts         # Agregação do relatório
+│   ├── persistent-rate-limit.ts # Limite de tentativas no banco (reserva em memória)
+│   ├── storage-cleanup.ts     # Remove mídias sem uso
+│   └── ...                    # auth, schemas, storage, password, display-token, etc.
+└── types/                     # Tipos do app e database.ts (gerado)
+public/sw-display.js           # Service worker do player (escopo /display/)
+tests/                         # Vitest
+e2e/                           # Playwright
+supabase/                      # config.toml, migrations/, seed.sql
+scripts/gen-db-types.mjs       # Gera e formata src/types/database.ts
 ```
 
 ---
 
 ## 5. Design system (Liquid Glass)
 
-A interface usa o design system [liquid-glass-ui](https://github.com/luscasHenrique/liquid-glass-ui), copiado para `src/components/ui/` e `src/styles/`. O guia completo (tokens, convenções e catálogo) está no `DESIGN_SYSTEM.md` daquele repositório.
+A interface usa o design system [liquid-glass-ui](https://github.com/luscasHenrique/liquid-glass-ui), copiado para `src/components/ui/` e `src/styles/`.
 
-**Regras deste projeto:**
-- **Não edite** `src/components/ui/` nem `src/styles/`. Para atualizar, copie de novo as pastas do repositório do design system. Essas pastas ficam fora do ESLint daqui, porque usam regras do `eslint-config-next` 16.
-- **Cores, raios e fontes vêm sempre dos tokens `--lg-*`.** O `globals.css` mapeia as classes do Tailwind para esses tokens (`text-muted-foreground`, `bg-muted`, `text-primary`, `border-border`, `rounded-lg`...), então elas também mudam com o tema. Use o Tailwind só para layout: grid, flex, espaçamentos e tamanhos.
-- **Tema:** claro, escuro ou automático, no botão do topo, salvo em `localStorage["lg-theme"]`. A tela de exibição fica sempre no tema escuro (`ThemeScope`).
-- **Posição:** as classes `.lg-glass` e `.lg-glass-strong` definem `position: relative` fora de camadas CSS e vencem utilitários como `absolute` e `fixed`. Para posicionar um vidro, use um elemento de fora para o posicionamento e um de dentro para o vidro.
-- **Sobre imagens**, use `.lg-glass-strong` e selos sólidos: o vidro normal e os selos `soft` perdem contraste.
-
-**Peças compartilhadas do painel** (`src/components/admin/`):
-
-| Componente | Uso |
-|---|---|
-| `AdminShell` | Sidebar no desktop, MobileMenu no celular, botão de tema e logout |
-| `PageHeader` | Título, descrição e ações de cada página |
-| `RowActions` | Botão "…" com o menu de ações de uma linha ou de um card |
-| `ConfirmDialog` | Confirmação de exclusão |
+- **Não edite** `src/components/ui/` nem `src/styles/`. Para atualizar, copie de novo as pastas do repositório do design system. Essas pastas ficam fora do ESLint daqui.
+- **Cores, raios e fontes vêm dos tokens `--lg-*`.** O `globals.css` mapeia as classes do Tailwind para esses tokens. Use o Tailwind só para layout.
+- **Tema:** claro, escuro ou automático, salvo em `localStorage["lg-theme"]`. A tela de exibição fica sempre no escuro (`ThemeScope`).
+- `.lg-glass` e `.lg-glass-strong` definem `position: relative` fora de camadas CSS. Para posicionar um vidro, use um elemento de fora.
+- `Badge` com `dot` mostra **só** um ponto, sem o texto.
 
 ---
 
@@ -128,124 +159,146 @@ A interface usa o design system [liquid-glass-ui](https://github.com/luscasHenri
 
 | Rota | Acesso | Descrição |
 |---|---|---|
-| `/` | Público | Página inicial |
-| `/login` | Público (quem já está logado vai para `/dashboard`) | Login |
-| `/dashboard`, `/dashboard/anuncios`, `/dashboard/empresas`, `/dashboard/empresas/[id]/anuncios` | Logado | Painel |
+| `/`, `/login`, `/recuperar-senha` | Público | Início, login e pedido de nova senha |
+| `/auth/callback` | Público | Valida o link do e-mail (só redireciona para caminhos internos) |
+| `/dashboard/...` (anúncios, empresas, relatórios, conta) | Logado | Painel |
 | `/dashboard/admin/usuarios`, `/dashboard/admin/auditoria` | **Só ADMIN** (os demais recebem 404) | Administração |
 | `/display/[slug]` | Público, ou cookie válido se a empresa for privada | Player |
 | `/display/[slug]/auth` | Público | Senha da empresa privada |
-| `GET /api/display/[slug]` | Mesma regra do player | JSON com os anúncios ativos |
+| `GET /api/display/[slug]` | Mesma regra do player | Anúncios em JSON, com `ETag` (304 se nada mudou); registra o contato da TV |
+| `POST /api/display/[slug]/plays` | Mesma regra do player | Recebe a contagem de exibições |
+| `GET /api/cron/cleanup-uploads` | `Authorization: Bearer $CRON_SECRET` | Limpeza diária (Vercel Cron, 06:30 UTC) |
 
-Cada camada faz a sua parte na autorização:
-- **middleware**: exige sessão em `/dashboard/*` e usa `getUser()`, que valida o token.
-- **páginas admin**: chamam `requireAdminPage()`.
-- **Server Actions**: chamam `getAuthContext()`. As actions de usuários exigem `ADMIN`. Server Actions são endpoints HTTP, então nunca podem depender só do middleware.
-- **display**: `hasDisplayAccess()` valida o JWT, que precisa ser da mesma empresa e da senha atual.
+Camadas de autorização:
+- **middleware:** sessão em `/dashboard/*` via `getUser()`;
+- **páginas admin:** `requireAdminPage()`;
+- **Server Actions:** `getAuthContext()`;
+- **display:** `hasDisplayAccess()`;
+- **banco:** RLS e grants de coluna.
+
+**Headers de segurança:** CSP (scripts só do próprio site; imagens e vídeos de qualquer `https`, porque anúncios podem usar links externos; conexão só com o Supabase; iframes só do YouTube), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy` e HSTS. O `robots.txt` bloqueia indexação, e as telas têm `noindex`.
 
 ---
 
-## 7. Modelo de dados (deduzido)
+## 7. Modelo de dados
 
 ```
 auth.users ──1:1── profiles (id, full_name, avatar_url, role: ADMIN|STANDARD)
+                    ← trigger on_auth_user_created (handle_new_user)
 
-companies (id uuid, name, slug, is_private, password [hash scrypt], created_at)
-    └──N:M── advertisements_companies (advertisement_id, company_id)
+companies (id, name, slug, is_private, password [scrypt], transition, created_at, updated_at)
+  ├──N:M── advertisements_companies (advertisement_id, company_id)
+  ├──1:1── display_heartbeats (company_id, last_seen_at, user_agent)
+  └──1:N── display_signals (company_id, updated_at)         ← triggers + Realtime
+
 advertisements (id, title, description, type, content_url, thumbnail_url,
-                start_date, end_date, duration_seconds, status,
-                overlay_text, overlay_position, overlay_bg_color, overlay_text_color,
-                created_by, last_edited_by, created_at, updated_at)
-audit_logs (id, created_at, action, table_name, record_pk, user_id, user_email,
-            before_data, after_data)                 ← triggers
-display_signals (company_id, updated_at)             ← nova; triggers + Realtime
+                start_date, end_date, duration_seconds, status, position,
+                weekdays smallint[], daily_start time, daily_end time,
+                overlay_*, created_by, last_edited_by, created_at, updated_at)
 
-Storage: bucket público "advertisements", caminho <user_id>/<timestamp>-<nome-sanitizado>
+ad_play_stats (day, company_id, advertisement_id, plays)   ← record_ad_plays()
+audit_logs (id, created_at, action, table_name, record_pk, user_id, user_email,
+            before_data, after_data)  ← fn_audit_row em advertisements, companies, profiles
+rate_limits (key, count, reset_at)    ← consume_rate_limit() / reset_rate_limit()
+
+Storage: bucket público "advertisements", caminho <user_id>/<timestamp>-<nome>
 ```
 
-O que a migração de segurança faz:
-1. Cria `display_signals` e os triggers que a atualizam quando anúncios ou vínculos de uma empresa mudam, e inclui a tabela na publicação do Realtime.
-2. Tira do papel `anon` o acesso a `companies`, `advertisements` e `advertisements_companies`.
-3. Impede que usuários logados leiam a coluna `companies.password` (passam a ter acesso apenas às colunas públicas).
-4. Impede que usuários logados alterem `profiles.role` pela API.
-5. Configura o bucket com limite de 200 MB e com os tipos de arquivo permitidos.
+**Permissões (após as migrações pendentes):**
 
-O banco também precisa ter:
-- um trigger que cria a linha em `profiles` quando um usuário é criado;
-- os triggers de auditoria.
+| Tabela | anon | authenticated | Escrita |
+|---|---|---|---|
+| `profiles` | — | lê todos; altera só `full_name`/`avatar_url` do próprio | admin via service role |
+| `companies` | — | lê as colunas públicas (sem `password`), CRUD | — |
+| `advertisements`, `advertisements_companies` | — | CRUD | — |
+| `display_signals` | lê | lê | triggers |
+| `display_heartbeats`, `ad_play_stats` | — | lê | servidor (service role) |
+| `audit_logs` | — | só ADMIN lê | triggers |
+| `rate_limits` | — | — | servidor (service role) |
+
+**Status do anúncio:** é só o liga/desliga manual. Período e dias/horários são aplicados pelo display e pelo painel. O trigger e o job diário que reescreviam o status foram removidos, porque reativavam anúncios desativados.
 
 ---
 
 ## 8. Fluxos principais
 
-### 8.1 Login
-`LoginForm` → action `login` (`signInWithPassword`, cookies via `createActionClient`). O middleware redireciona entre `/login` e `/dashboard`. O layout do painel carrega o papel do usuário para montar o menu.
+### 8.1 Login e conta
+- **Login:** action `login`. São 10 tentativas a cada 15 min por IP e e-mail, e o contador zera quando a pessoa acerta.
+- **Esqueci minha senha:** `/recuperar-senha` mostra a mesma resposta para qualquer e-mail e aceita 5 pedidos por hora por IP. O e-mail do Supabase leva a `/auth/callback`, que aceita o formato `code` (PKCE) e o `token_hash`. O link abre "Minha conta" para a pessoa criar a nova senha.
+- **Minha conta:** troca nome e senha.
 
-### 8.2 Anúncio com upload
-1. **O arquivo é enviado assim que é escolhido** (componente `FileUpload`), com progresso real e botão de cancelar. Enquanto o envio não termina, o botão "Salvar" fica desativado.
-2. O navegador valida tipo e tamanho (`validateUploadFile`). A action `getSignedUploadUrl` **repete a validação no servidor**, limpa o nome do arquivo e devolve uma URL assinada e a URL pública (`getPublicUrl`).
-3. O navegador envia o arquivo (`PUT` via XHR) direto para o Storage (`useStorageUpload`). O formulário guarda só a URL.
-4. Se o formulário for fechado sem salvar, ou o arquivo for trocado, os envios não usados são apagados pela action `discardUploads`. Ela só apaga arquivos da pasta do próprio usuário e que nenhum anúncio esteja usando.
-5. Datas: o início vale a partir de 00:00 do dia escolhido e o fim **até 23:59:59 do último dia**.
-6. `createAdvertisement` / `updateAdvertisement` validam os dados de novo. URLs só são aceitas com `http(s)`. Os vínculos com empresas são sincronizados por diferença: primeiro inclui os novos, depois remove os retirados. Assim o anúncio nunca fica sem empresas. Se os vínculos falharem na criação, o anúncio é apagado para desfazer a operação.
-7. Arquivos antigos do Storage são removidos quando possível (*best-effort*), sem impedir a operação se falharem.
+### 8.2 Anúncio
+1. O arquivo é enviado assim que é escolhido, por URL assinada e com progresso. Antes do envio, imagens JPEG/PNG/WebP grandes viram **WebP com no máximo 3840 px**. O seletor aceita até 30 MB, e o limite de 10 MB vale para o arquivo já reduzido.
+2. A action valida tudo de novo: só aceita URLs `http(s)`, datas coerentes e programação semanal válida.
+3. Os vínculos com empresas são sincronizados por diferença: primeiro inclui os novos, depois remove os retirados. Na criação, se os vínculos falharem, o anúncio é apagado.
+4. **Mídias que deixam de ser usadas** são apagadas com a service role, depois da checagem de sessão, e só se nenhum outro anúncio as usar. Uploads abandonados são apagados pelo cron diário depois de 24 h.
+5. **Ordem:** o diálogo "Ordem" grava as posições numa única chamada (`reorder_advertisements`). Anúncios novos entram no topo.
+6. **Programação semanal:** dias da semana e faixa "Das/Até" no horário de Brasília. Uma faixa como 22:00–02:00 atravessa a meia-noite e conta como o dia em que começou. Fora do horário, o anúncio aparece como "Fora do horário".
+7. **Duplicar** e **ações em lote** ficam no menu de cada anúncio e na seleção da tabela.
 
 ### 8.3 Display
-1. A página do servidor busca a empresa (service role) e verifica o acesso. Se for negado, redireciona para `/auth`.
-2. Busca os anúncios `ACTIVE` com `start_date ≤ agora ≤ end_date`.
-3. O player (`CompanyDisplay`) troca os anúncios de acordo com `duration_seconds`, mostra relógio, overlay e botão de tela cheia.
-4. Atualização:
-   - recarrega via `GET /api/display/[slug]` quando chega um evento Realtime em `display_signals` para aquela empresa, com debounce de 300 ms, e também a cada 30 s;
-   - se a API responder 401 (senha trocada ou acesso expirado), volta para a tela de senha;
-   - se houver falha de rede, mantém os anúncios atuais na tela.
-5. Imagens do Supabase e do YouTube passam pelo otimizador do Next. Links de outros domínios são exibidos com `unoptimized`.
+1. O servidor busca a empresa e verifica o acesso. Depois busca, numa só consulta, os anúncios ativos e dentro do período, na ordem do painel, e registra o contato da TV (`display_heartbeats`).
+2. O player:
+   - aplica os dias e horários a cada 30 s, inclusive offline;
+   - troca os slides pela duração, com a transição da empresa;
+   - deixa os vídeos **tocarem até o fim**, usando a duração como mínimo e com teto de 5 min.
+3. Atualização:
+   - Realtime em `display_signals`, com debounce, e consulta a cada 30 s com `ETag` (resposta 304 se nada mudou);
+   - pausa com a aba oculta;
+   - em caso de falha, espaça as tentativas até 5 min;
+   - se a API responder 401, volta para a tela de senha.
+4. **Falhas:**
+   - se a mídia quebra, o player pula para o próximo anúncio;
+   - se o único anúncio quebra, mostra um aviso e tenta de novo em 60 s;
+   - se o primeiro carregamento falha, a página **se recarrega sozinha** a cada 30 s.
+5. **Offline** (`public/sw-display.js`, só em produção):
+   - a página e a API seguem "rede primeiro, cópia em cache";
+   - os arquivos do Next e as imagens otimizadas seguem "cache primeiro";
+   - as mídias do Storage são baixadas assim que entram na lista e apagadas quando saem, com suporte a Range para os vídeos;
+   - outros hosts não são interceptados.
+6. **Contagem:** cada anúncio que entra na tela conta uma exibição. Com um anúncio só, conta uma por duração. A contagem fica no `localStorage` e é enviada a cada 5 min e ao fechar a página.
 
 ### 8.4 Display privado
-1. `verifyCompanyPassword` aceita **5 tentativas a cada 15 min por IP e empresa**.
-2. Lê a senha com service role e a compara com o hash scrypt. Senhas antigas em texto puro ainda são aceitas e são convertidas para hash no primeiro acesso.
-3. Emite um JWT com `slug` e uma impressão digital da senha (`pv`), válido por 30 dias, em cookie `httpOnly` com `sameSite=lax`.
-4. **Trocar a senha da empresa invalida todos os acessos já liberados.**
+1. Aceita 5 tentativas a cada 15 min por IP e empresa, com o contador no banco.
+2. Compara a senha com o hash scrypt. Senhas antigas em texto puro são convertidas no primeiro acesso.
+3. Emite um JWT com o `slug` e a impressão digital da senha, válido por 30 dias, em cookie `httpOnly`. Trocar a senha invalida os acessos já liberados.
 
-### 8.5 Auditoria
-Só ADMIN. Lê `audit_logs` com filtros e paginação:
-- o termo de busca é limpo antes de entrar no filtro `.or()` do PostgREST;
-- área e ação usam comparação exata;
-- os parâmetros de página são normalizados.
+### 8.5 Status das telas e relatório
+- **Empresas:** "No ar" se houve contato nos últimos 2 min. A lista se atualiza a cada minuto, e o dashboard mostra "Telas no ar X/Y".
+- **Relatórios:** soma de `ad_play_stats` por anúncio e por tela, num período (padrão: últimos 7 dias). O tempo de tela é exibições × duração configurada.
 
-Cada registro aparece num Accordion com um resumo ("Atualizou anúncio “X”"), as alterações campo a campo e o JSON de antes e depois. O valor do campo `password` é sempre mascarado.
+### 8.6 Auditoria
+Só ADMIN. Mostra filtros, paginação, um resumo legível e as alterações campo a campo. A senha nunca é gravada no log: aparece só "Senha alterada". Mudanças só de `updated_at` ou `position` não geram registro.
 
 ---
 
 ## 9. Qualidade
 
-| Verificação | Resultado (2026-10-06) |
+| Verificação | Resultado (2026-10-07) |
 |---|---|
 | `tsc --noEmit` | ✅ sem erros |
-| `eslint src tests` | ✅ 0 erros, 0 warnings |
-| `npm test` | ✅ 72 testes em 15 arquivos |
+| `npm run lint` | ✅ 0 erros, 0 warnings |
+| `npm test` | ✅ 111 testes em 23 arquivos |
+| `npm run test:e2e` | ✅ 6 testes (rodados duas vezes seguidas, partindo do zero) |
 | `npm audit --omit=dev` | ✅ 0 vulnerabilidades |
-| `npm run build` | ✅ (o aviso de Edge Runtime vem do supabase-js no middleware e já existia antes) |
+| `npm run build` | ✅ |
 
-Os testes cobrem:
-- hash e verificação de senha;
-- o token do display (outra empresa, senha trocada, assinatura falsa);
-- o limite de tentativas;
-- as regras de upload e de URL;
-- a limpeza do termo de busca da auditoria;
-- os schemas;
-- as actions de usuários (bloqueio de não-ADMIN) e de empresas (hash, manutenção da senha, limite de tentativas);
-- o controle de acesso do display;
-- o bloqueio de URLs `javascript:` e `data:` nos anúncios (formulário e servidor);
-- a situação do anúncio, os links do YouTube e as datas;
-- a formatação da auditoria (com a senha mascarada);
-- o menu ativo e a busca sem acentos.
+**Testes de ponta a ponta** (Supabase local, `e2e/`):
+- permissões do admin e do usuário comum;
+- desativar e ativar em lote;
+- API do display (ordem, só anúncios ativos, ETag/304);
+- tela privada com senha errada e certa;
+- status "No ar" depois de abrir a tela.
 
-As telas do painel foram conferidas com screenshots (Chrome headless), em tema claro e escuro, no desktop e no celular.
+Eles encontraram um bug real: o embed `companies` ficou ambíguo depois da tabela `ad_play_stats`.
 
-Teste com o servidor de produção, contra o Supabase real e sem alterar dados:
-- `/dashboard/admin/*` sem login redireciona para `/login`;
-- `createCompany` e `deleteCompany` chamadas sem login retornam "não autenticado";
-- a 6ª senha errada é bloqueada;
-- a API do display devolve 404 para slug inexistente.
+**Verificado manualmente no navegador** (build de produção com o Supabase local):
+- display offline: recarregar sem rede, imagem e vídeo em cache, Range 206 e API devolvendo a última lista;
+- programação semanal no display;
+- ordem dos anúncios;
+- upload de uma imagem 5000×3000 (4,3 MB) gravada como WebP de 94 KB;
+- recuperação de senha por link;
+- relatório: contagem enviada ao fechar a tela.
 
 ---
 
@@ -253,37 +306,29 @@ Teste com o servidor de produção, contra o Supabase real e sem alterar dados:
 
 | # | Achado | Status |
 |---|---|---|
-| S1 | Actions e páginas de usuários sem checar autenticação e papel | ✅ Corrigido (`getAuthContext` + `requireAdminPage`; ADMIN não pode excluir a si mesmo nem remover o próprio papel) |
-| S2 | Senha de empresa em texto puro e exposta | ✅ Hash scrypt com migração automática; leitura só com service role; páginas não enviam mais `password` para o navegador; a migração SQL bloqueia a coluna |
-| S3 | Conteúdo de empresas privadas acessível pela chave anon | ✅ Display lido pelo servidor e migração aplicada (anon sem acesso às tabelas) |
-| S4 | JWT do display não ligado ao slug | ✅ Valida `slug`, `sub` e a impressão digital da senha |
-| S5 | Força bruta na senha do display | ✅ 5 tentativas a cada 15 min (em memória; veja as pendências) |
-| S6 | `getSession()` no middleware | ✅ Trocado por `getUser()` |
-| S7 | Upload sem validação no servidor | ✅ Tipos e tamanhos validados no navegador e no servidor; nome do arquivo limpo; limites no bucket via migração |
-| S8 | `remotePatterns: "**"` | ✅ Só Supabase e `i.ytimg.com`; o resto usa `unoptimized` |
-| S9 | Termo de busca interpolado no filtro da auditoria | ✅ Termo limpo e paginação validada |
-| B1 | Editar empresa privada apagava a senha | ✅ Senha em branco mantém a atual |
-| B2 | Vínculos de anúncio não atômicos | ✅ Sincronização por diferença e desfazer na criação |
-| B3 | `logAudit` incompatível e sem uso | ✅ Removido |
-| B4 | Realtime ouvia todos os anúncios | ✅ `display_signals` filtrado por empresa |
-| S10 | URLs `javascript:`/`data:` aceitas em anúncios (o `z.string().url()` do zod 4 aceita qualquer esquema) | ✅ Só `http(s)`, no formulário e na action |
-| B6 | Anúncio saía do ar à 00:00 do último dia | ✅ Fim gravado como 23:59:59.999 (vale para anúncios salvos a partir de agora) |
-| B7 | O formulário não permitia desativar um anúncio | ✅ Chave "Anúncio ativo" |
-| S11 | Next.js 15.5.7 com vulnerabilidades críticas (RCE, bypass de middleware, DoS) e PostCSS vulnerável | ✅ Next 15.5.27 e PostCSS 8.5.29 (override); `npm audit` zerado |
-| S12 | Limite de tentativas em memória não funciona na Vercel (cada requisição pode cair numa instância) | ✅ No código: limite no banco (`consume_rate_limit`) com reserva em memória. ⏳ Requer a migração `20261006120000` |
-| B8 | Busca da Auditoria sempre dava erro (PostgREST não aceita `::text` em filtros) | ✅ Busca campo a campo no JSON com `->>` |
-| B9 | Tela de Usuários mostrava só os 50 primeiros | ✅ Percorre todas as páginas do `listUsers` |
-| B10 | Middleware podia perder cookies de sessão divididos ao renovar o token | ✅ `getAll`/`setAll` e redirecionamentos preservam os cookies |
-| P1 | "Anúncios da empresa" baixava os anúncios de todas as empresas | ✅ Filtro no banco (join interno) |
-| P2 | Layout e página do painel repetiam as consultas de sessão/perfil | ✅ `getPageAuthContext` com `cache()` por requisição |
-| P3 | Tela da TV carregava framer-motion e re-renderizava tudo a cada segundo | ✅ Transições em CSS, relógio isolado (atualiza por minuto), pré-carrega a próxima imagem; 193 KB → 157 KB |
-| — | Tela da TV | ✅ Mantém a tela ligada (Wake Lock), esconde cursor e botão com o mouse parado, pula anúncio com mídia quebrada, página 404 própria |
-| B5 | Detalhes nas actions de usuário | ✅ Nome obrigatório (schema único) |
-| — | Manutenção | ✅ Removidos `"use server"` do middleware, `@supabase/auth-helpers-nextjs` e `audio-toggle-button`; schemas unificados; retorno `{ success, message }` nas actions de auth; warnings do lint zerados; README reescrito; testes adicionados |
+| S1–S12, B1–B10, P1–P3 | Rodada de 2026-10-06 (autorização, hash de senha, display privado, upload, auditoria, dependências etc.) | ✅ Corrigidos (ver o histórico do git) |
+| S13 | Visitantes anônimos conseguiam listar todos os usuários (nome, ID e papel) em `profiles` | ✅ Na migração `20261007000000` ⏳ |
+| S14 | Sem headers de segurança | ✅ CSP, X-Frame-Options, HSTS etc. |
+| S15 | Login sem limite de tentativas próprio | ✅ 10 a cada 15 min por IP e e-mail |
+| S16 | Políticas antigas de leitura pública e `audit_logs` gravável por usuários logados | ✅ Removidas e fechada (`20261007000000`) ⏳ |
+| S17 | Funções `SECURITY DEFINER` sem `search_path` fixo e `is_admin` chamável por anônimos | ✅ (`20261007000000`) ⏳ |
+| B11 | **"Desativar" anúncio não funcionava**: um trigger e um job diário reativavam o anúncio dentro do período (e duplicavam a auditoria) | ✅ Removidos (`20261007000000`) ⏳ |
+| B12 | Editar ou excluir um anúncio de outro usuário deixava a mídia antiga no Storage (a política do bucket só deixa o dono apagar) | ✅ Remoção com service role + cron diário de órfãos |
+| B13 | Se o primeiro carregamento falhasse, a TV ficava travada na tela de erro | ✅ Recarrega sozinha |
+| B14 | Com um único anúncio e mídia quebrada, a tela ficava quebrada | ✅ Aviso e nova tentativa |
+| B15 | Vídeos eram cortados na duração configurada | ✅ Tocam até o fim (a duração vira o mínimo) |
+| B16 | Empresas não eram auditadas | ✅ Trigger em `companies`, sem a senha (`20261007000000`) ⏳ |
+| P4 | A API do display fazia 3 consultas a cada 30 s por TV e mandava o anúncio inteiro | ✅ 1 consulta, só as colunas usadas, ETag/304 |
+| P5 | Imagens enviadas no tamanho original (fotos de 5–10 MB) | ✅ WebP até 4K no navegador |
+| — | Ausência de schema versionado, ambiente de teste, CI, testes de ponta a ponta e tipos do banco | ✅ Tudo adicionado |
 
 ### Pendências
-- A migração `20261006000000` foi aplicada em produção em 2026-10-06. **Falta aplicar `20261006120000_rate_limit_and_indexes.sql`** (limite de tentativas persistente e índices). Sem ela o sistema funciona, mas o limite fica só na memória.
-- Conferir no Supabase se `audit_logs` só é legível por ADMIN (RLS).
-- O bucket continua público: qualquer pessoa com a URL exata de um arquivo consegue acessá-lo. Para privacidade total, usar bucket privado com URLs assinadas.
-- Os acessos a displays privados agora duram 30 dias, pensando em telas que ficam ligadas. Ajuste `DISPLAY_TOKEN_MAX_AGE_SECONDS` se precisar.
-- Ainda não existem testes de ponta a ponta (navegador) nem com usuário logado em um banco de teste.
+- **Aplicar as migrações** pendentes e marcar a linha de base como aplicada (seção 3), **antes** de publicar o código.
+- **Vercel:** definir `CRON_SECRET` para ativar a limpeza diária. Opcionalmente, definir `NEXT_PUBLIC_SITE_URL`.
+- **Supabase Auth:**
+  - em *Authentication → URL Configuration*, incluir `https://<seu-domínio>/auth/callback` nas Redirect URLs;
+  - configurar um SMTP próprio, porque o envio padrão do Supabase é limitado a poucos e-mails por hora.
+- Monitoramento de erros (Sentry ou similar) depende de uma conta.
+- O bucket continua público: qualquer pessoa com a URL exata de um arquivo o acessa.
+- A paginação no servidor da lista de anúncios não foi feita. O diálogo de ordem e os filtros por situação usam a lista completa, e o volume atual não justifica. Vale rever a partir de algumas centenas de anúncios.
+- Os testes de ponta a ponta rodam só localmente, porque precisam do Supabase local via Docker. Dá para incluí-los na CI com `supabase/setup-cli`.
