@@ -39,7 +39,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<ANON_KEY do supabase start>
 SUPABASE_SERVICE_ROLE_KEY=<SERVICE_ROLE_KEY do supabase start>
 ```
 
-Para criar um usuário admin local, cadastre-o pelo Auth (`http://127.0.0.1:54321/auth/v1/admin/users` com a service role) e troque `profiles.role` para `ADMIN`. Para voltar a usar produção, apague o `.env.development.local`. Para desligar: `npx supabase stop`.
+O `supabase db reset` recria o banco local com os dados de `supabase/seed.sql`: usuários `admin@local.test` e `standard@local.test` (senha `Senha-local-123`), duas empresas (`loja-centro` e `loja-privada`, senha `1234`) e alguns anúncios. Os testes `npm run test:e2e` usam esses dados e sobem o próprio servidor na porta 3100. Para voltar a usar produção, apague o `.env.development.local`. Para desligar: `npx supabase stop`.
 
 ## Scripts
 
@@ -49,6 +49,7 @@ Para criar um usuário admin local, cadastre-o pelo Auth (`http://127.0.0.1:5432
 | `npm test` | Testes (Vitest) |
 | `npm run lint` | ESLint |
 | `npm run db:types` | Regera `src/types/database.ts` a partir do Supabase local |
+| `npm run test:e2e` | Testes de ponta a ponta (Playwright) contra o Supabase local |
 | `npm run build` / `npm start` | Build e servidor de produção |
 
 ## Documentação

@@ -46,3 +46,7 @@ supabase/.temp
 
 # graphify (grafo local do projeto)
 graphify-out/
+
+# Playwright
+/test-results/
+/playwright-report/

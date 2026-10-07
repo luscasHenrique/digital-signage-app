@@ -16,9 +16,12 @@ export async function getAdvertisementsWithCompanies(
   supabase: SupabaseClient,
   companyId?: string
 ): Promise<AdvertisementWithCompanies[]> {
+  // "!advertisements_companies": há outro caminho anúncio↔empresa
+  // (ad_play_stats) e o PostgREST exige dizer qual usar
+  const companies = `companies!advertisements_companies(${COMPANY_PUBLIC_COLUMNS})`;
   const select = companyId
-    ? `*, companies(${COMPANY_PUBLIC_COLUMNS}), link:advertisements_companies!inner(company_id)`
-    : `*, companies(${COMPANY_PUBLIC_COLUMNS})`;
+    ? `*, ${companies}, link:advertisements_companies!inner(company_id)`
+    : `*, ${companies}`;
 
   let query = supabase
     .from("advertisements")
