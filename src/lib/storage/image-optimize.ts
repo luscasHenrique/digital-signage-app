@@ -1,4 +1,4 @@
-// src/lib/image-optimize.ts
+// src/lib/storage/image-optimize.ts
 // Reduz imagens no navegador antes do upload: TVs exibem no máximo 4K, então
 // fotos de celular (5–10 MB, 4000+ px) viram WebP com o lado maior em 3840 px.
 

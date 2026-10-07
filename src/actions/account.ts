@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getAuthContext } from "@/lib/auth";
-import { createPersistentRateLimiter } from "@/lib/persistent-rate-limit";
-import { getClientIp } from "@/lib/request-ip";
-import { getSiteOrigin } from "@/lib/site-url";
+import { createPersistentRateLimiter } from "@/lib/security/persistent-rate-limit";
+import { getClientIp } from "@/lib/security/request-ip";
+import { getSiteOrigin } from "@/lib/auth/site-url";
 import { createActionClient } from "@/lib/supabase/server";
 
 type ActionResult = { success: boolean; message: string };

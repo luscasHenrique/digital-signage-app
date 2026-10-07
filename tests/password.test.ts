@@ -4,7 +4,7 @@ import {
   isPasswordHash,
   passwordFingerprint,
   verifyPassword,
-} from "@/lib/password";
+} from "@/lib/security/password";
 
 describe("password", () => {
   it("gera hash que não contém a senha e valida corretamente", async () => {

@@ -26,7 +26,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 vi.mock("@/lib/auth", () => ({ getAuthContext: mocks.getAuthContext }));
 
 import { requestPasswordReset, updateOwnPassword } from "@/actions/account";
-import { safeRedirectPath } from "@/lib/site-url";
+import { safeRedirectPath } from "@/lib/auth/site-url";
 
 describe("requestPasswordReset", () => {
   beforeEach(() => {

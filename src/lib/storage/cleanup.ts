@@ -1,4 +1,4 @@
-// src/lib/storage-cleanup.ts
+// src/lib/storage/cleanup.ts
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";

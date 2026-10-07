@@ -1,4 +1,4 @@
-// src/lib/site-url.ts
+// src/lib/auth/site-url.ts
 import "server-only";
 
 import { headers } from "next/headers";

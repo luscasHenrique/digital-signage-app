@@ -1,8 +1,8 @@
-// src/lib/persistent-rate-limit.ts
+// src/lib/security/persistent-rate-limit.ts
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { createRateLimiter } from "@/lib/rate-limit";
+import { createRateLimiter } from "@/lib/security/rate-limit";
 
 type Options = { limit: number; windowMs: number };
 

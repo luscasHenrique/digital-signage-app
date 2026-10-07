@@ -1,4 +1,4 @@
-// src/lib/error-log.ts
+// src/lib/errors/log.ts
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";

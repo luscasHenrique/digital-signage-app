@@ -6,9 +6,9 @@ import {
   getDisplayCompany,
   hasDisplayAccess,
   recordDisplayHeartbeat,
-} from "@/lib/display";
-import { displayTokenCookieName } from "@/lib/display-token";
-import { logError } from "@/lib/error-log";
+} from "@/lib/display/data";
+import { displayTokenCookieName } from "@/lib/display/token";
+import { logError } from "@/lib/errors/log";
 
 export const dynamic = "force-dynamic";
 

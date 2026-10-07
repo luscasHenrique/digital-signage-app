@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diffCompanyLinks } from "@/lib/advertisement-links";
+import { diffCompanyLinks } from "@/lib/ads/links";
 
 describe("diffCompanyLinks", () => {
   it("calcula inclusões e remoções", () => {

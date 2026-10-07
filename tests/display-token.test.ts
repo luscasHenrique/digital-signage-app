@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SignJWT } from "jose";
-import { createDisplayToken, verifyDisplayToken } from "@/lib/display-token";
+import { createDisplayToken, verifyDisplayToken } from "@/lib/display/token";
 
 describe("display token", () => {
   it("vale para a empresa e a senha para as quais foi emitido", async () => {

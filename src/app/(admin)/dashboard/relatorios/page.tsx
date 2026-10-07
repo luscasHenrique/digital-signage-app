@@ -1,13 +1,13 @@
 // src/app/(admin)/dashboard/relatorios/page.tsx
 import type { Metadata } from "next";
 import { ReportsClient } from "@/components/admin/reports/ReportsClient";
-import { getCompanies } from "@/lib/advertisement-queries";
+import { getCompanies } from "@/lib/ads/queries";
 import { playDay } from "@/components/display/play-counter";
 import {
   aggregatePlays,
   parseDayParam,
   type PlayStatRow,
-} from "@/lib/play-report";
+} from "@/lib/ads/play-report";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Relatórios" };

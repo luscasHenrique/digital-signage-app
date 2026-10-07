@@ -5,7 +5,7 @@ import {
   getAdvertisementsPage,
   getCompanies,
   parseAdsSearchParams,
-} from "@/lib/advertisement-queries";
+} from "@/lib/ads/queries";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 

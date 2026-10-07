@@ -3,9 +3,9 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getYoutubeEmbedUrl } from "@/lib/advertisement-display";
-import { isPlayableNow } from "@/lib/ad-weekly-schedule";
-import { reportClientError } from "@/lib/error-reporter";
+import { getYoutubeEmbedUrl } from "@/lib/ads/advertisement";
+import { isPlayableNow } from "@/lib/ads/weekly-schedule";
+import { reportClientError } from "@/lib/errors/reporter";
 import { isOptimizableImage } from "@/lib/storage";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeScope } from "@/components/ui/Theme/ThemeScope";

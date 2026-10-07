@@ -3,7 +3,7 @@ import { Building2, Megaphone, MonitorPlay, PlayCircle } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { Card } from "@/components/ui/Card/Card";
-import { ONLINE_THRESHOLD_MS } from "@/lib/display-status";
+import { ONLINE_THRESHOLD_MS } from "@/lib/display/status";
 import { createClient } from "@/lib/supabase/server";
 import { AdvertisementStatus } from "@/types";
 import type { Metadata } from "next";

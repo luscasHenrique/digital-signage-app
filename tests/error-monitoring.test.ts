@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { errorFingerprint, groupErrors } from "@/lib/error-report-format";
+import { errorFingerprint, groupErrors } from "@/lib/errors/format";
 
 describe("agrupamento de erros", () => {
   it("ignora ids, números e URLs ao comparar mensagens", () => {
@@ -28,12 +28,12 @@ describe("reportClientError", () => {
     fetchMock.mockReset().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("window", { location: { pathname: "/display/loja", href: "http://x/display/loja" } });
-    const { resetErrorReporter } = await import("@/lib/error-reporter");
+    const { resetErrorReporter } = await import("@/lib/errors/reporter");
     resetErrorReporter();
   });
 
   it("envia uma vez e ignora repetições dentro de 1 min", async () => {
-    const { reportClientError } = await import("@/lib/error-reporter");
+    const { reportClientError } = await import("@/lib/errors/reporter");
     reportClientError(new Error("Mídia quebrada"));
     reportClientError(new Error("Mídia quebrada"));
     expect(fetchMock).toHaveBeenCalledTimes(1);

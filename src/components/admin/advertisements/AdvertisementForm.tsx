@@ -33,10 +33,10 @@ import {
   isUploadType,
   isVideoType,
   startOfDay,
-} from "@/lib/advertisement-display";
+} from "@/lib/ads/advertisement";
 import { applyActionErrors } from "@/lib/form-errors";
-import { toHHMM } from "@/lib/ad-weekly-schedule";
-import { MAX_IMAGE_SOURCE_BYTES } from "@/lib/image-optimize";
+import { toHHMM } from "@/lib/ads/weekly-schedule";
+import { MAX_IMAGE_SOURCE_BYTES } from "@/lib/storage/image-optimize";
 import {
   advertisementFormSchema,
   type AdvertisementFormSchemaData,

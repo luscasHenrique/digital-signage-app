@@ -1,4 +1,4 @@
-// src/lib/display-token.ts
+// src/lib/display/token.ts
 import { SignJWT, jwtVerify } from "jose";
 
 const SUBJECT = "company-access";

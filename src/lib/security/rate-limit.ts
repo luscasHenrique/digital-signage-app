@@ -1,4 +1,4 @@
-// src/lib/rate-limit.ts
+// src/lib/security/rate-limit.ts
 
 /**
  * Limitador de tentativas em memória (janela fixa).

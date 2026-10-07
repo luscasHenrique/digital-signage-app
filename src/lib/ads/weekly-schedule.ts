@@ -1,4 +1,4 @@
-// src/lib/ad-weekly-schedule.ts
+// src/lib/ads/weekly-schedule.ts
 // Programação semanal dos anúncios: dias da semana e faixa de horário.
 // As regras valem no horário de Brasília, independente do fuso da TV/servidor.
 import { AdvertisementStatus } from "@/types";

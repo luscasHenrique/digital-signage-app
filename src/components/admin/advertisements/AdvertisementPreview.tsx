@@ -4,7 +4,7 @@ import { Film } from "lucide-react";
 import {
   getYoutubeThumbnailUrl,
   isVideoType,
-} from "@/lib/advertisement-display";
+} from "@/lib/ads/advertisement";
 import { isOptimizableImage } from "@/lib/storage";
 import { Advertisement, AdvertisementType } from "@/types";
 

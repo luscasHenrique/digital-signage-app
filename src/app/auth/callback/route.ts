@@ -1,7 +1,7 @@
 // src/app/auth/callback/route.ts
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
-import { safeRedirectPath } from "@/lib/site-url";
+import { safeRedirectPath } from "@/lib/auth/site-url";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";

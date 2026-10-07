@@ -1,9 +1,9 @@
-// src/lib/advertisement-display.ts
+// src/lib/ads/advertisement.ts
 import { Advertisement, AdvertisementStatus, AdvertisementType } from "@/types";
 import {
   isWithinWeeklySchedule,
   type WeeklySchedule,
-} from "@/lib/ad-weekly-schedule";
+} from "@/lib/ads/weekly-schedule";
 
 export function getYoutubeVideoId(
   url: string | null | undefined

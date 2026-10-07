@@ -6,7 +6,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   supabaseAdmin: { rpc: mocks.rpc },
 }));
 
-import { createPersistentRateLimiter } from "@/lib/persistent-rate-limit";
+import { createPersistentRateLimiter } from "@/lib/security/persistent-rate-limit";
 
 const rpcResult = (result: { data?: unknown; error?: unknown }) => ({
   single: () => Promise.resolve({ data: null, error: null, ...result }),

@@ -13,7 +13,7 @@ export const onRequestError: Instrumentation.onRequestError = async (
   // O registro usa a service role (Node); no Edge só fica no log da Vercel
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
-  const { logError } = await import("@/lib/error-log");
+  const { logError } = await import("@/lib/errors/log");
   const err = error as Error & { digest?: string };
   await logError({
     source: "server",

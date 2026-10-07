@@ -1,4 +1,4 @@
-// src/lib/error-report-format.ts
+// src/lib/errors/format.ts
 // Formatação da página "Erros" do painel.
 
 export type ErrorLogRow = {

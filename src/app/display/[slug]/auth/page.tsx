@@ -4,8 +4,8 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { PasswordForm } from "@/components/auth/PasswordForm";
 import styles from "@/components/auth/auth.module.css";
-import { getDisplayCompany, hasDisplayAccess } from "@/lib/display";
-import { displayTokenCookieName } from "@/lib/display-token";
+import { getDisplayCompany, hasDisplayAccess } from "@/lib/display/data";
+import { displayTokenCookieName } from "@/lib/display/token";
 
 export async function generateMetadata({
   params,

@@ -13,7 +13,7 @@ import {
 import { RowActions } from "@/components/admin/RowActions";
 import { Badge } from "@/components/ui/Badge/Badge";
 import { Card } from "@/components/ui/Card/Card";
-import { formatWeeklySchedule } from "@/lib/ad-weekly-schedule";
+import { formatWeeklySchedule } from "@/lib/ads/weekly-schedule";
 import { formatPeriod } from "@/lib/format";
 import { AdvertisementPreview } from "./AdvertisementPreview";
 import type { AdvertisementWithCompanies } from "@/types";

@@ -1,10 +1,10 @@
-// src/lib/display.ts
+// src/lib/display/data.ts
 import "server-only";
 
 import { cache } from "react";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { passwordFingerprint } from "@/lib/password";
-import { verifyDisplayToken } from "@/lib/display-token";
+import { passwordFingerprint } from "@/lib/security/password";
+import { verifyDisplayToken } from "@/lib/display/token";
 import {
   AdvertisementStatus,
   DISPLAY_AD_COLUMNS,

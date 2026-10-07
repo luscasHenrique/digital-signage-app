@@ -24,7 +24,7 @@ import {
   updateCompany,
   verifyCompanyPassword,
 } from "@/actions/companies";
-import { hashPassword, isPasswordHash } from "@/lib/password";
+import { hashPassword, isPasswordHash } from "@/lib/security/password";
 
 function findCall(
   log: ReturnType<typeof fakeClient>["log"],

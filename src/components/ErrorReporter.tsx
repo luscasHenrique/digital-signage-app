@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { reportClientError } from "@/lib/error-reporter";
+import { reportClientError } from "@/lib/errors/reporter";
 
 /** Captura erros não tratados do navegador (inclusive de promises). */
 export function ErrorReporter() {

@@ -15,7 +15,7 @@ import {
   ERROR_SOURCE_LABEL,
   type ErrorLogRow,
   type groupErrors,
-} from "@/lib/error-report-format";
+} from "@/lib/errors/format";
 
 interface ErrorsClientProps {
   rows: ErrorLogRow[];

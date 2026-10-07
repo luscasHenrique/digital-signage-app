@@ -1,4 +1,4 @@
-// src/lib/auth.ts
+// src/lib/auth/index.ts
 import "server-only";
 
 import { cache } from "react";

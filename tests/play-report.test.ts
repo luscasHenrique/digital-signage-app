@@ -4,7 +4,7 @@ import {
   formatDuration,
   parseDayParam,
   type PlayStatRow,
-} from "@/lib/play-report";
+} from "@/lib/ads/play-report";
 
 const row = (over: Partial<PlayStatRow>): PlayStatRow => ({
   day: "2026-10-07",

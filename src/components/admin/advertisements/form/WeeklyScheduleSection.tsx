@@ -7,7 +7,7 @@ import { TextField } from "@/components/ui/TextField/TextField";
 import {
   WEEKDAY_SHORT,
   formatWeeklySchedule,
-} from "@/lib/ad-weekly-schedule";
+} from "@/lib/ads/weekly-schedule";
 import type { AdvertisementFormSchemaData } from "@/lib/schemas";
 import { FormSection as Section } from "./FormSection";
 

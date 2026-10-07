@@ -3,7 +3,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAuthContext } from "@/lib/auth";
-import { ORDER_LIST_COLUMNS } from "@/lib/advertisement-queries";
+import { ORDER_LIST_COLUMNS } from "@/lib/ads/queries";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   isHttpUrl,
@@ -17,7 +17,7 @@ import {
   sanitizeFileName,
   validateUploadFile,
 } from "@/lib/storage";
-import { diffCompanyLinks } from "@/lib/advertisement-links";
+import { diffCompanyLinks } from "@/lib/ads/links";
 import {
   AdvertisementStatus,
   AdvertisementType,

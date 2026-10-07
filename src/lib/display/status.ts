@@ -1,4 +1,4 @@
-// src/lib/display-status.ts
+// src/lib/display/status.ts
 // Status das TVs a partir do último contato do player (display_heartbeats).
 
 /** O player consulta a cada 30 s; 2 min sem contato = fora do ar. */

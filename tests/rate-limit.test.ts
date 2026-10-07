@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createRateLimiter } from "@/lib/rate-limit";
+import { createRateLimiter } from "@/lib/security/rate-limit";
 
 describe("rate limiter", () => {
   it("bloqueia após o limite e libera quando a janela expira", () => {

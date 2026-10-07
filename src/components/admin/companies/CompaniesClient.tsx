@@ -24,7 +24,7 @@ import { TextField } from "@/components/ui/TextField/TextField";
 import { useToast } from "@/components/ui/Toast/Toast";
 import { normalizeSearch } from "@/lib/search";
 import { Company, type CompanyWithStatus } from "@/types";
-import { getDisplayStatus } from "@/lib/display-status";
+import { getDisplayStatus } from "@/lib/display/status";
 import { DisplayStatusBadge } from "./DisplayStatusBadge";
 import { CompanyForm } from "./CompanyForm";
 

@@ -1,4 +1,4 @@
-// src/lib/play-report.ts
+// src/lib/ads/play-report.ts
 // Agrega as linhas de ad_play_stats para a página de relatório.
 
 export type PlayStatRow = {

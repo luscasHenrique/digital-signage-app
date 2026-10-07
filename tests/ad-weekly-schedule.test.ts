@@ -4,7 +4,7 @@ import {
   isPlayableNow,
   isWithinWeeklySchedule,
   zonedClock,
-} from "@/lib/ad-weekly-schedule";
+} from "@/lib/ads/weekly-schedule";
 
 // Brasília é UTC-3 (sem horário de verão): 15:00Z = 12:00 local
 const at = (iso: string) => new Date(iso);

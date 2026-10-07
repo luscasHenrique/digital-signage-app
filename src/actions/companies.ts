@@ -10,14 +10,14 @@ import {
   hashPassword,
   passwordFingerprint,
   verifyPassword,
-} from "@/lib/password";
+} from "@/lib/security/password";
 import {
   DISPLAY_TOKEN_MAX_AGE_SECONDS,
   createDisplayToken,
   displayTokenCookieName,
-} from "@/lib/display-token";
-import { createPersistentRateLimiter } from "@/lib/persistent-rate-limit";
-import { getClientIp } from "@/lib/request-ip";
+} from "@/lib/display/token";
+import { createPersistentRateLimiter } from "@/lib/security/persistent-rate-limit";
+import { getClientIp } from "@/lib/security/request-ip";
 
 type FieldErrors = Record<string, string[] | undefined>;
 type FormActionResult =

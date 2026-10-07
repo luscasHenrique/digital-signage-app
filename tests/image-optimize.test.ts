@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitWithin, optimizeImageForUpload, webpFileName } from "@/lib/image-optimize";
+import { fitWithin, optimizeImageForUpload, webpFileName } from "@/lib/storage/image-optimize";
 
 describe("fitWithin", () => {
   it("reduz mantendo a proporção só quando passa do limite", () => {

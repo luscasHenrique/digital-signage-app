@@ -18,7 +18,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   },
 }));
 
-import { cleanupOrphanUploads } from "@/lib/storage-cleanup";
+import { cleanupOrphanUploads } from "@/lib/storage/cleanup";
 
 const NOW = Date.parse("2026-10-07T12:00:00Z");
 const OLD = "2026-10-05T12:00:00Z";

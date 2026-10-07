@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { discardUploads, getSignedUploadUrl } from "@/actions/advertisements";
 import type { UploadHandler } from "@/components/ui/FileUpload/FileUpload";
-import { optimizeImageForUpload } from "@/lib/image-optimize";
+import { optimizeImageForUpload } from "@/lib/storage/image-optimize";
 import { validateUploadFile } from "@/lib/storage";
 
 /** PUT do arquivo na URL assinada com progresso real e cancelamento. */

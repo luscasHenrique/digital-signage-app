@@ -1,4 +1,4 @@
-// src/lib/request-ip.ts
+// src/lib/security/request-ip.ts
 import "server-only";
 
 import { headers } from "next/headers";

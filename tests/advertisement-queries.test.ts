@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseAdsSearchParams } from "@/lib/advertisement-queries";
+import { parseAdsSearchParams } from "@/lib/ads/queries";
 
 describe("parseAdsSearchParams", () => {
   it("lê busca, situação e página da URL com valores seguros", () => {

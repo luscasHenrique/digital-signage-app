@@ -9,8 +9,8 @@ import {
   getDisplayCompany,
   hasDisplayAccess,
   recordDisplayHeartbeat,
-} from "@/lib/display";
-import { displayTokenCookieName } from "@/lib/display-token";
+} from "@/lib/display/data";
+import { displayTokenCookieName } from "@/lib/display/token";
 
 export const revalidate = 0; // sem cache
 export async function generateMetadata({

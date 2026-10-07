@@ -37,9 +37,9 @@ import {
   AD_SCHEDULE_LABEL,
   AD_TYPE_LABEL,
   getAdSchedule,
-} from "@/lib/advertisement-display";
-import type { AdScheduleFilter } from "@/lib/advertisement-queries";
-import { formatWeeklySchedule } from "@/lib/ad-weekly-schedule";
+} from "@/lib/ads/advertisement";
+import type { AdScheduleFilter } from "@/lib/ads/queries";
+import { formatWeeklySchedule } from "@/lib/ads/weekly-schedule";
 import { formatPeriod } from "@/lib/format";
 import {
   AdvertisementStatus,

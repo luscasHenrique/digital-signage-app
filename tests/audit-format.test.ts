@@ -4,7 +4,7 @@ import {
   formatAuditValue,
   redactSecrets,
   summarizeAudit,
-} from "@/lib/audit-format";
+} from "@/lib/audit/format";
 
 describe("audit-format", () => {
   it("resume a ação com a área e o título do registro", () => {

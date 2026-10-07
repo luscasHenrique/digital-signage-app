@@ -4,7 +4,7 @@ import {
   AD_SCHEDULE_LABEL,
   getAdSchedule,
   type AdSchedule,
-} from "@/lib/advertisement-display";
+} from "@/lib/ads/advertisement";
 import { Advertisement } from "@/types";
 
 const tone: Record<AdSchedule, "success" | "accent" | "neutral" | "warning"> = {

@@ -14,7 +14,7 @@ import {
   formatDuration,
   type aggregatePlays,
   type PlayReportLine,
-} from "@/lib/play-report";
+} from "@/lib/ads/play-report";
 import type { Company } from "@/types";
 
 interface ReportsClientProps {

@@ -1,8 +1,8 @@
 // src/app/api/display/[slug]/plays/route.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { getDisplayCompany, hasDisplayAccess } from "@/lib/display";
-import { displayTokenCookieName } from "@/lib/display-token";
+import { getDisplayCompany, hasDisplayAccess } from "@/lib/display/data";
+import { displayTokenCookieName } from "@/lib/display/token";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";

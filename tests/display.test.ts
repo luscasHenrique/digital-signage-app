@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase/admin", () => ({ supabaseAdmin: {} }));
 
-import { hasDisplayAccess, type DisplayCompany } from "@/lib/display";
-import { createDisplayToken } from "@/lib/display-token";
-import { hashPassword, passwordFingerprint } from "@/lib/password";
+import { hasDisplayAccess, type DisplayCompany } from "@/lib/display/data";
+import { createDisplayToken } from "@/lib/display/token";
+import { hashPassword, passwordFingerprint } from "@/lib/security/password";
 
 async function privateCompany(slug: string, password: string) {
   return {

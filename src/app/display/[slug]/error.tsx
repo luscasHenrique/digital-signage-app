@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { DisplayError } from "@/components/display/DisplayError";
-import { reportClientError } from "@/lib/error-reporter";
+import { reportClientError } from "@/lib/errors/reporter";
 
 export default function DisplayErrorBoundary({
   error,

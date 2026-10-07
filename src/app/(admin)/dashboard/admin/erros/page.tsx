@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import { ErrorsClient } from "@/components/admin/errors/ErrorsClient";
 import { requireAdminPage } from "@/lib/auth";
-import { groupErrors, type ErrorLogRow } from "@/lib/error-report-format";
+import { groupErrors, type ErrorLogRow } from "@/lib/errors/format";
 import { parsePageParam, sanitizeAuditSearchTerm } from "@/types/audit";
 
 export const metadata: Metadata = { title: "Erros" };

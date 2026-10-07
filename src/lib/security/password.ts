@@ -1,4 +1,4 @@
-// src/lib/password.ts
+// src/lib/security/password.ts
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 
 // Formato armazenado: scrypt$<salt base64>$<hash base64>

@@ -27,6 +27,7 @@ Plataforma de **sinalização digital (digital signage)**. No painel, os usuári
 | Relatórios | Exibições e tempo de tela por anúncio e por tela, num período |
 | Usuários (só ADMIN) | Cadastro de usuários com papéis `ADMIN` / `STANDARD` |
 | Auditoria (só ADMIN) | Histórico de `audit_logs` (anúncios, empresas e perfis), preenchido por triggers |
+| Erros (só ADMIN) | Falhas do servidor, do painel e das TVs (`error_logs`, 30 dias) |
 
 ---
 
@@ -95,6 +96,7 @@ As migrações ficam em `supabase/migrations/` e são aplicadas em produção co
 | `20261007000000_policies_cleanup_and_status_fix` | `profiles` fechado para visitantes, políticas antigas removidas, `audit_logs` só por trigger, status manual (remove o trigger e o job que reativavam anúncios), auditoria de empresas | ⏳ Pendente |
 | `20261007120000_display_features` | `position`, `weekdays`/`daily_start`/`daily_end`, `companies.transition`, `display_heartbeats` | ⏳ Pendente |
 | `20261007180000_play_stats` | `ad_play_stats` + `record_ad_plays` | ⏳ Pendente |
+| `20261008000000_error_logs` | `error_logs` (monitoramento de erros) | ⏳ Pendente |
 
 > **Ordem de publicação:** aplicar as migrações **antes** de publicar o código. A partir do commit `6e5d228`, o código usa colunas e tabelas que só existem depois delas.
 
@@ -124,15 +126,16 @@ src/
 │   ├── auth/                  # LoginForm, ForgotPasswordForm, PasswordForm
 │   ├── display/               # Player, hooks (wake lock, offline, contagem), play-counter
 │   └── ui/                    # Design system Liquid Glass (não editar; ver seção 5)
-├── lib/
-│   ├── ad-weekly-schedule.ts  # Dias/horários (horário de Brasília)
-│   ├── display.ts             # Dados, acesso e heartbeat do display (service role)
-│   ├── display-status.ts      # "No ar" / "Sem sinal" a partir do último contato
-│   ├── image-optimize.ts      # Reduz imagens no navegador antes do upload
-│   ├── play-report.ts         # Agregação do relatório
-│   ├── persistent-rate-limit.ts # Limite de tentativas no banco (reserva em memória)
-│   ├── storage-cleanup.ts     # Remove mídias sem uso
-│   └── ...                    # auth, schemas, storage, password, display-token, etc.
+├── lib/                       # Organizado por domínio
+│   ├── ads/                   # weekly-schedule, advertisement (situação, YouTube, datas), links, queries (paginação), play-report
+│   ├── auth/                  # getAuthContext/requireAdminPage (index), site-url
+│   ├── audit/format.ts        # Textos da auditoria
+│   ├── display/               # data (dados, acesso, heartbeat), token (JWT), status ("No ar")
+│   ├── errors/                # log (grava em error_logs), reporter (navegador), format (página Erros)
+│   ├── security/              # password (scrypt), rate-limit, persistent-rate-limit, request-ip
+│   ├── storage/               # regras do bucket (index), cleanup, image-optimize
+│   ├── supabase/              # Clientes: navegador, servidor e admin
+│   └── schemas.ts, format.ts, search.ts, form-errors.ts
 └── types/                     # Tipos do app e database.ts (gerado)
 public/sw-display.js           # Service worker do player (escopo /display/)
 tests/                         # Vitest
@@ -328,7 +331,5 @@ Eles encontraram um bug real: o embed `companies` ficou ambíguo depois da tabel
 - **Supabase Auth:**
   - em *Authentication → URL Configuration*, incluir `https://<seu-domínio>/auth/callback` nas Redirect URLs;
   - configurar um SMTP próprio, porque o envio padrão do Supabase é limitado a poucos e-mails por hora.
-- Monitoramento de erros (Sentry ou similar) depende de uma conta.
 - O bucket continua público: qualquer pessoa com a URL exata de um arquivo o acessa.
-- A paginação no servidor da lista de anúncios não foi feita. O diálogo de ordem e os filtros por situação usam a lista completa, e o volume atual não justifica. Vale rever a partir de algumas centenas de anúncios.
 - Os testes de ponta a ponta rodam só localmente, porque precisam do Supabase local via Docker. Dá para incluí-los na CI com `supabase/setup-cli`.

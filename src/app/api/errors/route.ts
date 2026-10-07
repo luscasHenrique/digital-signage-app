@@ -2,8 +2,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getAuthContext } from "@/lib/auth";
-import { logError } from "@/lib/error-log";
-import { createPersistentRateLimiter } from "@/lib/persistent-rate-limit";
+import { logError } from "@/lib/errors/log";
+import { createPersistentRateLimiter } from "@/lib/security/persistent-rate-limit";
 
 export const dynamic = "force-dynamic";
 

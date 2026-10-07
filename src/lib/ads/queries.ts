@@ -1,8 +1,8 @@
-// src/lib/advertisement-queries.ts
+// src/lib/ads/queries.ts
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { AdSchedule } from "@/lib/advertisement-display";
+import type { AdSchedule } from "@/lib/ads/advertisement";
 import { sanitizeAuditSearchTerm } from "@/types/audit";
 import type { Database } from "@/types/database";
 import {

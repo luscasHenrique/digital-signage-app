@@ -1,8 +1,8 @@
 "use server";
 
 import { createActionClient } from "@/lib/supabase/server";
-import { createPersistentRateLimiter } from "@/lib/persistent-rate-limit";
-import { getClientIp } from "@/lib/request-ip";
+import { createPersistentRateLimiter } from "@/lib/security/persistent-rate-limit";
+import { getClientIp } from "@/lib/security/request-ip";
 import { revalidatePath } from "next/cache";
 
 type ActionResult = { success: boolean; message: string };

@@ -1,4 +1,4 @@
-// src/lib/storage.ts
+// src/lib/storage/index.ts
 // Regras do bucket de anúncios, compartilhadas entre client e server.
 
 export const ADVERTISEMENTS_BUCKET = "advertisements";

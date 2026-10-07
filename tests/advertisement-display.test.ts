@@ -6,7 +6,7 @@ import {
   getYoutubeThumbnailUrl,
   getYoutubeVideoId,
   startOfDay,
-} from "@/lib/advertisement-display";
+} from "@/lib/ads/advertisement";
 import { AdvertisementStatus } from "@/types";
 
 describe("YouTube", () => {

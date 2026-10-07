@@ -1,4 +1,4 @@
-// src/lib/advertisement-links.ts
+// src/lib/ads/links.ts
 
 /** Calcula quais vínculos anúncio↔empresa precisam ser criados e removidos. */
 export function diffCompanyLinks(

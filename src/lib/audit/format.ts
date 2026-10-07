@@ -1,4 +1,4 @@
-// src/lib/audit-format.ts
+// src/lib/audit/format.ts
 // Transforma registros de audit_logs em textos legíveis para a tela de Auditoria.
 import type { AuditAction, JsonObject } from "@/types/audit";
 

@@ -1,4 +1,4 @@
-// src/lib/error-reporter.ts
+// src/lib/errors/reporter.ts
 // Envio de erros do navegador para /api/errors (página "Erros" do painel).
 
 type ClientErrorSource = "client" | "display";

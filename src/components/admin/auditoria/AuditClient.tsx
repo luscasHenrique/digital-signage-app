@@ -26,7 +26,7 @@ import type { DateRange } from "@/components/ui/DatePicker/date-utils";
 import { Select } from "@/components/ui/Select/Select";
 import { TextField } from "@/components/ui/TextField/TextField";
 import { useToast } from "@/components/ui/Toast/Toast";
-import { endOfDay, startOfDay } from "@/lib/advertisement-display";
+import { endOfDay, startOfDay } from "@/lib/ads/advertisement";
 import {
   AUDIT_ACTION_LABEL,
   AUDIT_TABLE_LABEL,
@@ -34,7 +34,7 @@ import {
   entityLabel,
   redactSecrets,
   summarizeAudit,
-} from "@/lib/audit-format";
+} from "@/lib/audit/format";
 import type { AuditAction, AuditRow } from "@/types/audit";
 
 type Filters = {

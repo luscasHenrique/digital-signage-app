@@ -1,7 +1,7 @@
 // src/app/api/cron/cleanup-uploads/route.ts
 import { NextResponse, type NextRequest } from "next/server";
-import { purgeOldErrorLogs } from "@/lib/error-log";
-import { cleanupOrphanUploads } from "@/lib/storage-cleanup";
+import { purgeOldErrorLogs } from "@/lib/errors/log";
+import { cleanupOrphanUploads } from "@/lib/storage/cleanup";
 
 export const dynamic = "force-dynamic";
 

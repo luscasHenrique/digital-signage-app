@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/Button/Button";
 import { Card } from "@/components/ui/Card/Card";
-import { reportClientError } from "@/lib/error-reporter";
+import { reportClientError } from "@/lib/errors/reporter";
 
 export default function Error({
   error,

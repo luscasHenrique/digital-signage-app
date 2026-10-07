@@ -1,7 +1,7 @@
 // src/components/display/play-counter.ts
 // Contagem de exibições no player. Fica no localStorage até ser enviada,
 // então sobrevive a recarregamentos e a períodos sem internet.
-import { SCHEDULE_TIME_ZONE } from "@/lib/ad-weekly-schedule";
+import { SCHEDULE_TIME_ZONE } from "@/lib/ads/weekly-schedule";
 
 export type PlayCounts = Record<string, number>; // "YYYY-MM-DD|ad_id" -> exibições
 
