@@ -27,6 +27,46 @@ export function useIdle(timeoutMs: number): boolean {
 }
 
 /**
+ * Registra o service worker que mantém o display funcionando sem internet
+ * (ver public/sw-display.js). Só em produção: no dev ele atrapalharia o HMR.
+ */
+export function useOfflineSupport(slug: string) {
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") return;
+    if (!("serviceWorker" in navigator)) return;
+
+    const supabaseOrigin = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!)
+      .origin;
+    navigator.serviceWorker
+      .register(
+        `/sw-display.js?supabase=${encodeURIComponent(supabaseOrigin)}`,
+        { scope: "/display/" }
+      )
+      .then(() => navigator.serviceWorker.ready)
+      .then((registration) => {
+        // Guarda já a página e a lista atual (sem esperar o próximo refetch)
+        // Scripts/CSS/fontes/imagens já baixados antes do worker assumir a página
+        const assets = performance
+          .getEntriesByType("resource")
+          .map((entry) => entry.name)
+          .filter(
+            (url) =>
+              url.includes("/_next/static/") || url.includes("/_next/image")
+          );
+        registration.active?.postMessage({
+          type: "warm",
+          page: window.location.pathname,
+          api: `/api/display/${encodeURIComponent(slug)}`,
+          assets,
+        });
+      })
+      .catch((error) =>
+        console.warn("Não foi possível ativar o modo offline:", error)
+      );
+  }, [slug]);
+}
+
+/**
  * Impede que a tela apague ou entre em repouso enquanto exibe anúncios.
  * O navegador solta o bloqueio quando a aba fica oculta; ele é pedido de novo ao voltar.
  */

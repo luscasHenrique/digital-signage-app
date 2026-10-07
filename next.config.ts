@@ -1,8 +1,13 @@
 import type { NextConfig } from "next";
 
-const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
-  ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
-  : "pbwpybwviymcxvdmqplv.supabase.co";
+const supabaseUrl = new URL(
+  process.env.NEXT_PUBLIC_SUPABASE_URL ??
+    "https://pbwpybwviymcxvdmqplv.supabase.co"
+);
+const supabaseHost = supabaseUrl.hostname;
+// Origem completa (protocolo + porta): no Supabase local é http://127.0.0.1:54321
+const supabaseOrigin = supabaseUrl.origin;
+const supabaseRealtimeOrigin = supabaseOrigin.replace(/^http/, "ws");
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -13,10 +18,10 @@ const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https:",
-  "media-src 'self' blob: https:",
+  `img-src 'self' data: blob: https: ${supabaseOrigin}`,
+  `media-src 'self' blob: https: ${supabaseOrigin}`,
   "font-src 'self' data:",
-  `connect-src 'self' https://${supabaseHost} wss://${supabaseHost}`,
+  `connect-src 'self' ${supabaseOrigin} ${supabaseRealtimeOrigin}`,
   "frame-src https://www.youtube.com https://www.youtube-nocookie.com",
   "object-src 'none'",
   "base-uri 'self'",
@@ -45,8 +50,9 @@ const nextConfig: NextConfig = {
     // Links externos de anúncios são renderizados com `unoptimized` (ver isOptimizableImage).
     remotePatterns: [
       {
-        protocol: "https",
+        protocol: supabaseUrl.protocol === "http:" ? "http" : "https",
         hostname: supabaseHost,
+        port: supabaseUrl.port,
         pathname: "/storage/v1/object/public/**",
       },
       {

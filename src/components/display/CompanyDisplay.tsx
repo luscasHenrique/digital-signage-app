@@ -10,7 +10,7 @@ import { ThemeScope } from "@/components/ui/Theme/ThemeScope";
 import { AdvertisementType, OverlayPosition, type DisplayAd } from "@/types";
 import { DisplayClock } from "./DisplayClock";
 import { FullscreenButton } from "./FullscreenButton";
-import { useIdle, useWakeLock } from "./hooks";
+import { useIdle, useOfflineSupport, useWakeLock } from "./hooks";
 import styles from "./CompanyDisplay.module.css";
 
 type AnimationType = "fade" | "slideFromRight" | "zoomIn";
@@ -51,6 +51,7 @@ export function CompanyDisplay({
   const supabase = useMemo(() => createClient(), []);
   const idle = useIdle(3000);
   useWakeLock();
+  useOfflineSupport(slug);
 
   // Se o servidor mandar novos `ads`, ressincroniza
   useEffect(() => {
