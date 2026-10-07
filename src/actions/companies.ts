@@ -209,7 +209,7 @@ export async function verifyCompanyPassword(
       return { success: false, message: "Senha incorreta." };
     }
 
-    let storedPassword: string = company.password;
+    let storedPassword: string | null = company.password;
     if (needsRehash) {
       // Migra senha legada (texto puro) para hash.
       const hashed = await hashPassword(password);

@@ -1,5 +1,6 @@
 // src/lib/supabase/admin.ts
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
 import "server-only"; // Garante que este código NUNCA seja exposto no cliente
 
 // Validação das variáveis de ambiente
@@ -12,7 +13,7 @@ if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
 
 // Cria um cliente com permissões de administrador.
 // Use com MUITO cuidado, pois ele ignora todas as políticas de RLS.
-export const supabaseAdmin = createClient(
+export const supabaseAdmin = createClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY,
   {

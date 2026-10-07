@@ -48,6 +48,7 @@ Para criar um usuário admin local, cadastre-o pelo Auth (`http://127.0.0.1:5432
 | `npm run dev` | Servidor de desenvolvimento |
 | `npm test` | Testes (Vitest) |
 | `npm run lint` | ESLint |
+| `npm run db:types` | Regera `src/types/database.ts` a partir do Supabase local |
 | `npm run build` / `npm start` | Build e servidor de produção |
 
 ## Documentação
