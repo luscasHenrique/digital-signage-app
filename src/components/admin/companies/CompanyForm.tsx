@@ -56,6 +56,7 @@ export function CompanyForm({ initialData, onSuccess }: CompanyFormProps) {
       slug: initialData?.slug || "",
       is_private: initialData?.is_private || false,
       transition: initialData?.transition ?? "slideFromRight",
+      show_clock: initialData?.show_clock ?? true,
       password: "",
     },
   });
@@ -129,6 +130,21 @@ export function CompanyForm({ initialData, onSuccess }: CompanyFormProps) {
               value && field.onChange(value as DisplayTransition)
             }
             error={errors.transition?.message}
+          />
+        )}
+      />
+
+      <Controller
+        control={form.control}
+        name="show_clock"
+        render={({ field }) => (
+          <Switch
+            name={field.name}
+            checked={field.value}
+            onChange={(e) => field.onChange(e.target.checked)}
+            onBlur={field.onBlur}
+            label="Mostrar horário na tela"
+            description="Exibe a hora e a data no canto da tela de anúncios."
           />
         )}
       />

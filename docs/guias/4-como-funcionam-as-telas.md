@@ -13,10 +13,12 @@ Cada empresa tem uma tela em `https://SEU-DOMINIO/display/<endereço-da-empresa>
 - **Busca novidades**:
   - na hora, quando alguém altera um anúncio da empresa;
   - de qualquer forma, a cada 30 segundos.
+- **Mostra o relógio** (hora e data) no canto, se a opção **Mostrar horário na tela** estiver ligada na empresa. A mudança chega na TV em segundos, sem recarregar.
+- **Toca vídeos do YouTube e do Vimeo** (tipo "YouTube / Vimeo"), sem som e em loop. O painel recusa links que a TV não consegue tocar, como um link do YouTube no tipo "Vídeo (link .mp4)".
 - **Não deixa a TV apagar**: pede ao navegador para manter a tela ligada.
 - **Esconde o cursor e o botão de tela cheia** depois de 3 segundos sem mexer o mouse.
 - **Pula anúncios quebrados**: se uma imagem ou vídeo não carrega, vai para o próximo. Se for o único, mostra "Conteúdo indisponível no momento" e tenta de novo em 1 minuto.
-- **Se recupera sozinha**: se o servidor falhar ao abrir a tela, ela mostra "Tentando novamente em 30s…" e recarrega sozinha. Não precisa ninguém ir até a TV.
+- **Se recupera sozinha**: se o servidor falhar ao abrir a tela, ela mostra "Tentando novamente em 30s…" e recarrega sozinha. Não precisa ninguém ir até a TV. Se a TV já tinha aberto antes, ela continua passando a última lista guardada em vez de mostrar o erro.
 
 ---
 
@@ -56,13 +58,14 @@ A tela guarda no navegador tudo o que precisa para continuar exibindo.
 ### O que acontece quando a internet cai
 - A TV **continua passando** a última lista, inclusive ao ser recarregada ou religada.
 - Os **dias e horários** continuam sendo respeitados: a tela consulta o próprio relógio.
-- As **exibições continuam sendo contadas** e ficam guardadas para enviar depois.
+- As **exibições continuam sendo contadas** e ficam guardadas para enviar depois (até 30 dias).
+- Anúncios de **YouTube/Vimeo saem da fila** enquanto não houver internet, desde que existam outros anúncios. Assim a TV não fica com a tela preta.
 - No painel, a tela passa para **"Sem sinal há X"**.
 
 ### Quando a internet volta
 - Em até alguns minutos, a tela busca a lista nova. Se a queda foi longa, ela espaça as tentativas até 5 minutos, para não sobrecarregar.
 - O status volta para **"No ar"**.
-- As exibições guardadas são enviadas para o relatório.
+- As exibições guardadas são enviadas para o relatório, em lotes se a queda tiver sido longa.
 
 ### Limites do modo offline
 - **A tela precisa ter aberto ao menos uma vez com internet**, já no site publicado, para guardar tudo. Abra a tela, espere 1 minuto e pronto.

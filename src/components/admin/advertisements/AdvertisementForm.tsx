@@ -101,7 +101,7 @@ const typeOptions = [
   {
     value: AdvertisementType.EMBED_LINK,
     label: AD_TYPE_LABEL[AdvertisementType.EMBED_LINK],
-    description: "Link de um vídeo do YouTube.",
+    description: "Link de um vídeo do YouTube ou do Vimeo.",
     icon: <Youtube />,
   },
 ];
@@ -327,13 +327,15 @@ export function AdvertisementForm({
                   type="url"
                   label={
                     adType === AdvertisementType.EMBED_LINK
-                      ? "Link do YouTube"
+                      ? "Link do YouTube ou do Vimeo"
                       : "URL do conteúdo"
                   }
                   placeholder={
                     adType === AdvertisementType.EMBED_LINK
-                      ? "https://www.youtube.com/watch?v=..."
-                      : "https://..."
+                      ? "https://www.youtube.com/watch?v=... ou https://vimeo.com/..."
+                      : adType === AdvertisementType.VIDEO_LINK
+                        ? "https://.../video.mp4"
+                        : "https://..."
                   }
                   leftIcon={<Link2 />}
                   required

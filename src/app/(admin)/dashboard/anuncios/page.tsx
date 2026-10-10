@@ -6,7 +6,9 @@ import {
   getCompanies,
   parseAdsSearchParams,
 } from "@/lib/ads/queries";
+import { getPageAuthContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { UserRole } from "@/types";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Anúncios" };
@@ -20,6 +22,7 @@ export default async function AnunciosPage({
 }) {
   const filters = parseAdsSearchParams(await searchParams);
   const supabase = createClient();
+  const ctx = await getPageAuthContext();
 
   const [{ ads, total }, companies] = await Promise.all([
     getAdvertisementsPage(supabase, filters),
@@ -38,6 +41,7 @@ export default async function AnunciosPage({
       perPage={ADS_PER_PAGE}
       filters={filters}
       companies={companies}
+      canEdit={ctx?.role === UserRole.ADMIN}
     />
   );
 }

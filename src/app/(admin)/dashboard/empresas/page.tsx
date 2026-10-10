@@ -1,5 +1,6 @@
+import { getPageAuthContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { COMPANY_PUBLIC_COLUMNS, type CompanyWithStatus } from "@/types";
+import { COMPANY_PUBLIC_COLUMNS, UserRole, type CompanyWithStatus } from "@/types";
 import { CompaniesClient } from "@/components/admin/companies/CompaniesClient";
 import type { Metadata } from "next";
 
@@ -7,6 +8,7 @@ export const metadata: Metadata = { title: "Empresas" };
 
 export default async function EmpresasPage() {
   const supabase = createClient();
+  const ctx = await getPageAuthContext();
 
   const { data: companies, error } = await supabase
     .from("companies")
@@ -24,6 +26,7 @@ export default async function EmpresasPage() {
   return (
     <CompaniesClient
       companies={(companies ?? []) as unknown as CompanyWithStatus[]}
+      canEdit={ctx?.role === UserRole.ADMIN}
     />
   );
 }

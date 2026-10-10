@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { CompanyDisplay } from "@/components/display/CompanyDisplay";
 import { DisplayError } from "@/components/display/DisplayError";
 import {
+  displaySettings,
   getActiveAdsForCompany,
   getDisplayCompany,
   hasDisplayAccess,
@@ -64,7 +65,7 @@ export default async function DisplayPage({ params }: DisplayPageProps) {
       ads={ads}
       companyId={company.id}
       slug={company.slug}
-      animationType={company.transition}
+      settings={displaySettings(company)}
     />
   );
 }

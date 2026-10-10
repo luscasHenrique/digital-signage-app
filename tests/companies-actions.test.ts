@@ -21,6 +21,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 import {
   createCompany,
+  deleteCompany,
   updateCompany,
   verifyCompanyPassword,
 } from "@/actions/companies";
@@ -41,7 +42,7 @@ function useUserClient(results: Parameters<typeof fakeClient>[0] = {}) {
   const fake = fakeClient(results);
   mocks.getAuthContext.mockResolvedValue({
     user: { id: "u1" },
-    role: UserRole.STANDARD,
+    role: UserRole.ADMIN,
     supabase: fake.client,
   });
   return fake;
@@ -57,6 +58,7 @@ const company = {
   name: "Empresa X",
   slug: "empresa-x",
   transition: "fade" as const,
+  show_clock: true,
 };
 
 describe("createCompany / updateCompany", () => {
@@ -66,6 +68,24 @@ describe("createCompany / updateCompany", () => {
     mocks.getAuthContext.mockResolvedValue(null);
     const result = await createCompany({ ...company, is_private: false });
     expect(result.success).toBe(false);
+  });
+
+  it("só ADMIN cria, edita ou exclui empresas", async () => {
+    const fake = fakeClient();
+    mocks.getAuthContext.mockResolvedValue({
+      user: { id: "u2" },
+      role: UserRole.STANDARD,
+      supabase: fake.client,
+    });
+
+    const created = await createCompany({ ...company, is_private: false });
+    const updated = await updateCompany({ ...company, id: "c1", is_private: false });
+    const deleted = await deleteCompany("c1");
+
+    expect(created.success).toBe(false);
+    expect(updated.success).toBe(false);
+    expect(deleted.success).toBe(false);
+    expect(fake.log).toHaveLength(0);
   });
 
   it("salva a senha como hash, nunca em texto puro (S2)", async () => {

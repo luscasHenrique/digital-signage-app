@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  MAX_PAYLOAD_ITEMS,
   addPlay,
+  dropExpired,
+  nextBatch,
   playDay,
   subtractSent,
   toPayload,
@@ -28,5 +31,20 @@ describe("play-counter", () => {
     const sent = { "2026-10-07|a": 2, "2026-10-07|b": 1 };
     const current = { "2026-10-07|a": 3, "2026-10-07|b": 1 };
     expect(subtractSent(current, sent)).toEqual({ "2026-10-07|a": 1 });
+  });
+
+  it("envia em lotes do tamanho aceito pela API", () => {
+    const counts = Object.fromEntries(
+      Array.from({ length: MAX_PAYLOAD_ITEMS + 20 }, (_, i) => [`2026-10-07|ad${i}`, 1])
+    );
+    const { items, sent } = nextBatch(counts);
+    expect(items).toHaveLength(MAX_PAYLOAD_ITEMS);
+    expect(Object.keys(subtractSent(counts, sent))).toHaveLength(20);
+  });
+
+  it("descarta dias que o servidor não aceita mais", () => {
+    const now = new Date("2026-10-31T15:00:00Z");
+    const counts = { "2026-09-01|a": 5, "2026-10-20|a": 2 };
+    expect(dropExpired(counts, now)).toEqual({ "2026-10-20|a": 2 });
   });
 });

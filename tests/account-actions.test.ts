@@ -87,6 +87,8 @@ describe("safeRedirectPath", () => {
     expect(safeRedirectPath("/dashboard/conta?x=1")).toBe("/dashboard/conta?x=1");
     expect(safeRedirectPath("//evil.com")).toBe("/dashboard");
     expect(safeRedirectPath("https://evil.com")).toBe("/dashboard");
+    expect(safeRedirectPath("/\\evil.com")).toBe("/dashboard");
+    expect(safeRedirectPath("/%5Cevil.com")).toBe("/%5Cevil.com");
     expect(safeRedirectPath(null)).toBe("/dashboard");
   });
 });

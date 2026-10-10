@@ -55,11 +55,19 @@ export interface Company {
   is_private: boolean;
   /** Animação de troca entre anúncios no display */
   transition: DisplayTransition;
+  /** Mostra o relógio no canto da tela */
+  show_clock: boolean;
   created_at: string;
 }
 
 export const DISPLAY_TRANSITIONS = ["fade", "slideFromRight", "zoomIn"] as const;
 export type DisplayTransition = (typeof DISPLAY_TRANSITIONS)[number];
+
+/** Configurações da empresa que o player aplica (mudam sem recarregar a página). */
+export interface DisplaySettings {
+  transition: DisplayTransition;
+  showClock: boolean;
+}
 
 /** Empresa com o último contato do display (status da TV no painel). */
 export type CompanyWithStatus = Company & {
@@ -68,7 +76,7 @@ export type CompanyWithStatus = Company & {
 
 /** Colunas de `companies` que podem ir para o navegador (nunca inclui `password`). */
 export const COMPANY_PUBLIC_COLUMNS =
-  "id, name, slug, is_private, transition, created_at";
+  "id, name, slug, is_private, transition, show_clock, created_at";
 
 /* =========================
    ANÚNCIOS

@@ -14,6 +14,7 @@ async function privateCompany(slug: string, password: string) {
     is_private: true,
     password: await hashPassword(password),
     transition: "fade",
+    show_clock: true,
   } satisfies DisplayCompany;
 }
 
@@ -25,6 +26,7 @@ describe("hasDisplayAccess", () => {
       slug: "publica",
       is_private: false,
       transition: "fade",
+    show_clock: true,
       password: "",
     };
     expect(await hasDisplayAccess(company, undefined)).toBe(true);

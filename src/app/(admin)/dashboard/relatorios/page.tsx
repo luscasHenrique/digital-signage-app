@@ -4,9 +4,9 @@ import { ReportsClient } from "@/components/admin/reports/ReportsClient";
 import { getCompanies } from "@/lib/ads/queries";
 import { playDay } from "@/components/display/play-counter";
 import {
-  aggregatePlays,
+  buildPlayReport,
   parseDayParam,
-  type PlayStatRow,
+  type PlayReportRow,
 } from "@/lib/ads/play-report";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,22 +30,18 @@ export default async function RelatoriosPage({
   const companyId = params.company || "";
 
   const supabase = createClient();
-  let query = supabase
-    .from("ad_play_stats")
-    .select(
-      "day, plays, advertisement_id, company_id, advertisement:advertisements(title, duration_seconds), company:companies(name)"
-    )
-    .gte("day", from)
-    .lte("day", to);
-  if (companyId) query = query.eq("company_id", companyId);
-
+  // Somado no banco: uma linha por anúncio + empresa, qualquer que seja o período
   const [{ data, error }, companies] = await Promise.all([
-    query,
+    supabase.rpc("ad_play_report", {
+      p_from: from,
+      p_to: to,
+      ...(companyId ? { p_company_id: companyId } : {}),
+    }),
     getCompanies(supabase),
   ]);
   if (error) throw error;
 
-  const report = aggregatePlays((data ?? []) as unknown as PlayStatRow[]);
+  const report = buildPlayReport((data ?? []) as PlayReportRow[]);
 
   return (
     <ReportsClient

@@ -9,6 +9,7 @@ import {
   AdvertisementStatus,
   DISPLAY_AD_COLUMNS,
   type DisplayAd,
+  type DisplaySettings,
   type DisplayTransition,
 } from "@/types";
 
@@ -22,6 +23,11 @@ export interface DisplayCompany {
   is_private: boolean;
   password: string | null;
   transition: DisplayTransition;
+  show_clock: boolean;
+}
+
+export function displaySettings(company: DisplayCompany): DisplaySettings {
+  return { transition: company.transition, showClock: company.show_clock };
 }
 
 /** Deduplicado por requisição (metadata + página buscam a mesma empresa). */
@@ -30,7 +36,7 @@ export const getDisplayCompany = cache(async function getDisplayCompany(
 ): Promise<DisplayCompany | null> {
   const { data, error } = await supabaseAdmin
     .from("companies")
-    .select("id, name, slug, is_private, password, transition")
+    .select("id, name, slug, is_private, password, transition, show_clock")
     .eq("slug", slug)
     .maybeSingle<DisplayCompany>();
 

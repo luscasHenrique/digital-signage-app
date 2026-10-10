@@ -7,6 +7,8 @@ export type Database = {
     Tables: {
       "ad_play_stats": {
         Row: {
+          "ad_duration_seconds": number | null;
+          "ad_title": string | null;
           "advertisement_id": string;
           "company_id": string;
           "day": string;
@@ -14,29 +16,22 @@ export type Database = {
         };
         ComputedFields: never;
         Insert: {
+          "ad_duration_seconds"?: number | null;
+          "ad_title"?: string | null;
           "advertisement_id": string;
           "company_id": string;
           "day": string;
           "plays"?: number;
         };
         Update: {
+          "ad_duration_seconds"?: number | null;
+          "ad_title"?: string | null;
           "advertisement_id"?: string;
           "company_id"?: string;
           "day"?: string;
           "plays"?: number;
         };
         Relationships: [
-          {
-            foreignKeyName: "ad_play_stats_advertisement_id_fkey";
-            columns: [
-              "advertisement_id"
-            ];
-            isOneToOne: false;
-            referencedRelation: "advertisements";
-            referencedColumns: [
-              "id"
-            ];
-          },
           {
             foreignKeyName: "ad_play_stats_company_id_fkey";
             columns: [
@@ -211,6 +206,7 @@ export type Database = {
           "is_private": boolean | null;
           "name": string;
           "password": string | null;
+          "show_clock": boolean;
           "slug": string;
           "transition": string;
           "updated_at": string | null;
@@ -222,6 +218,7 @@ export type Database = {
           "is_private"?: boolean | null;
           "name": string;
           "password"?: string | null;
+          "show_clock"?: boolean;
           "slug": string;
           "transition"?: string;
           "updated_at"?: string | null;
@@ -232,6 +229,7 @@ export type Database = {
           "is_private"?: boolean | null;
           "name"?: string;
           "password"?: string | null;
+          "show_clock"?: boolean;
           "slug"?: string;
           "transition"?: string;
           "updated_at"?: string | null;
@@ -387,6 +385,22 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      "ad_play_report": {
+        Args: {
+          "p_company_id"?: string;
+          "p_from": string;
+          "p_to": string;
+        };
+        Returns: {
+          "ad_deleted": boolean;
+          "ad_title": string;
+          "advertisement_id": string;
+          "company_id": string;
+          "company_name": string;
+          "plays": number;
+          "seconds": number;
+        }[];
+      };
       "consume_rate_limit": {
         Args: {
           "p_key": string;

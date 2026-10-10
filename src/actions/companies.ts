@@ -18,15 +18,22 @@ import {
 } from "@/lib/display/token";
 import { createPersistentRateLimiter } from "@/lib/security/persistent-rate-limit";
 import { getClientIp } from "@/lib/security/request-ip";
+import { UserRole } from "@/types";
 
 type FieldErrors = Record<string, string[] | undefined>;
 type FormActionResult =
   { success: true; message: string } | { success: false; message: FieldErrors };
 
-const NOT_AUTHENTICATED: FormActionResult = {
-  success: false,
-  message: { _server: ["Usuário não autenticado."] },
-};
+const NOT_AUTHENTICATED = "Usuário não autenticado.";
+const NOT_ADMIN = "Apenas administradores podem alterar empresas.";
+
+/** Só ADMIN configura empresas (o RLS do banco aplica a mesma regra). */
+async function getAdminContext() {
+  const ctx = await getAuthContext();
+  if (!ctx) return { ctx: null, error: NOT_AUTHENTICATED } as const;
+  if (ctx.role !== UserRole.ADMIN) return { ctx: null, error: NOT_ADMIN } as const;
+  return { ctx, error: null } as const;
+}
 
 // Action para CRIAR uma nova empresa
 export async function createCompany(
@@ -37,17 +44,19 @@ export async function createCompany(
     return { success: false, message: validation.error.flatten().fieldErrors };
   }
 
-  const ctx = await getAuthContext();
-  if (!ctx) return NOT_AUTHENTICATED;
+  const { ctx, error: authError } = await getAdminContext();
+  if (!ctx) return { success: false, message: { _server: [authError] } };
 
   try {
-    const { name, slug, is_private, transition, password } = validation.data;
+    const { name, slug, is_private, transition, show_clock, password } =
+      validation.data;
 
     const { error } = await ctx.supabase.from("companies").insert({
       name,
       slug,
       is_private,
       transition,
+      show_clock,
       password: is_private && password ? await hashPassword(password) : "",
     });
     if (error) throw error;
@@ -73,10 +82,11 @@ export async function updateCompany(
     return { success: false, message: validation.error.flatten().fieldErrors };
   }
 
-  const ctx = await getAuthContext();
-  if (!ctx) return NOT_AUTHENTICATED;
+  const { ctx, error: authError } = await getAdminContext();
+  if (!ctx) return { success: false, message: { _server: [authError] } };
 
-  const { id, name, slug, is_private, transition, password } = validation.data;
+  const { id, name, slug, is_private, transition, show_clock, password } =
+    validation.data;
   if (!id) {
     return {
       success: false,
@@ -90,6 +100,7 @@ export async function updateCompany(
       slug,
       is_private,
       transition,
+      show_clock,
     };
 
     if (!is_private) {
@@ -136,8 +147,8 @@ export async function updateCompany(
 export async function deleteCompany(
   companyId: string
 ): Promise<{ success: boolean; message: string }> {
-  const ctx = await getAuthContext();
-  if (!ctx) return { success: false, message: "Usuário não autenticado." };
+  const { ctx, error: authError } = await getAdminContext();
+  if (!ctx) return { success: false, message: authError };
   if (!companyId) {
     return { success: false, message: "ID da empresa não fornecido." };
   }

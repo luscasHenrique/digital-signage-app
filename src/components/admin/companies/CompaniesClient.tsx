@@ -30,12 +30,14 @@ import { CompanyForm } from "./CompanyForm";
 
 interface CompaniesClientProps {
   companies: CompanyWithStatus[];
+  /** Só ADMIN cria, edita e exclui empresas */
+  canEdit: boolean;
 }
 
 /** Atualiza o status das TVs enquanto a página está aberta. */
 const STATUS_REFRESH_MS = 60_000;
 
-export function CompaniesClient({ companies }: CompaniesClientProps) {
+export function CompaniesClient({ companies, canEdit }: CompaniesClientProps) {
   const router = useRouter();
   const toast = useToast();
 
@@ -142,13 +144,17 @@ export function CompaniesClient({ companies }: CompaniesClientProps) {
       cell: (c) => (
         <RowActions
           items={[
+            ...(canEdit
+              ? [
+                  {
+                    label: "Editar",
+                    icon: <Pencil />,
+                    onSelect: () => handleOpenModal(c),
+                  },
+                ]
+              : []),
             {
-              label: "Editar",
-              icon: <Pencil />,
-              onSelect: () => handleOpenModal(c),
-            },
-            {
-              label: "Gerenciar anúncios",
+              label: canEdit ? "Gerenciar anúncios" : "Ver anúncios",
               icon: <Megaphone />,
               onSelect: () =>
                 router.push(`/dashboard/empresas/${c.id}/anuncios`),
@@ -158,13 +164,17 @@ export function CompaniesClient({ companies }: CompaniesClientProps) {
               icon: <ExternalLink />,
               onSelect: () => window.open(`/display/${c.slug}`, "_blank"),
             },
-            { type: "separator" },
-            {
-              label: "Excluir",
-              icon: <Trash2 />,
-              tone: "danger",
-              onSelect: () => setCompanyToDelete(c),
-            },
+            ...(canEdit
+              ? [
+                  { type: "separator" as const },
+                  {
+                    label: "Excluir",
+                    icon: <Trash2 />,
+                    tone: "danger" as const,
+                    onSelect: () => setCompanyToDelete(c),
+                  },
+                ]
+              : []),
           ]}
         />
       ),
@@ -177,9 +187,11 @@ export function CompaniesClient({ companies }: CompaniesClientProps) {
         title="Empresas"
         description="Cada empresa tem a sua própria tela de exibição."
         actions={
-          <Button leftIcon={<Plus />} onClick={() => handleOpenModal(null)}>
-            Nova empresa
-          </Button>
+          canEdit && (
+            <Button leftIcon={<Plus />} onClick={() => handleOpenModal(null)}>
+              Nova empresa
+            </Button>
+          )
         }
       />
 

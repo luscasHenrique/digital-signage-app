@@ -7,6 +7,7 @@ import {
   OverlayPosition,
   UserRole,
 } from "@/types";
+import { contentUrlProblem } from "@/lib/ads/advertisement";
 
 /** Só aceita URLs http(s): bloqueia javascript:, data: etc. (viram XSS em href/src). */
 export function isHttpUrl(value: string | null | undefined): boolean {
@@ -124,6 +125,9 @@ export const advertisementFormSchema = z
           ? "Envie o arquivo do anúncio."
           : "Informe uma URL válida (começando com https://)."
       );
+    } else if (data.type && data.content_url) {
+      const problem = contentUrlProblem(data.type, data.content_url);
+      if (problem) issue("content_url", problem);
     }
 
     if (data.thumbnail_url && !isHttpUrl(data.thumbnail_url)) {
@@ -153,6 +157,8 @@ export const companySchema = z
       ),
     is_private: z.boolean(),
     transition: z.enum(DISPLAY_TRANSITIONS),
+    /** Mostra o relógio (hora e data) no canto da tela. */
+    show_clock: z.boolean(),
     // Em edição, vazio significa "manter a senha atual".
     password: z
       .string()

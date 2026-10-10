@@ -12,7 +12,7 @@ import {
   UserRole,
 } from "@/types";
 
-const base = { name: "Empresa X", slug: "empresa-x", transition: "fade" };
+const base = { name: "Empresa X", slug: "empresa-x", transition: "fade", show_clock: true };
 
 describe("companySchema", () => {
   it("exige senha ao criar empresa privada", () => {

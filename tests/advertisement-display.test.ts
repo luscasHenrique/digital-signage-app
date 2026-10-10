@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  contentUrlProblem,
   endOfDay,
   getAdSchedule,
+  getEmbedUrl,
+  getVimeoVideo,
   getYoutubeEmbedUrl,
   getYoutubeThumbnailUrl,
   getYoutubeVideoId,
   startOfDay,
 } from "@/lib/ads/advertisement";
-import { AdvertisementStatus } from "@/types";
+import { AdvertisementStatus, AdvertisementType } from "@/types";
 
 describe("YouTube", () => {
   it.each([
@@ -35,6 +38,34 @@ describe("YouTube", () => {
     expect(embed).toContain("/embed/abc");
     expect(embed).toContain("mute=1");
     expect(embed).toContain("loop=1&playlist=abc");
+  });
+});
+
+describe("Vimeo e validação de links", () => {
+  it.each([
+    ["https://vimeo.com/76979871", "76979871", null],
+    ["https://vimeo.com/76979871/abc123ef", "76979871", "abc123ef"],
+    ["https://vimeo.com/channels/staffpicks/76979871", "76979871", null],
+    ["https://player.vimeo.com/video/76979871?h=ff00", "76979871", "ff00"],
+  ])("reconhece %s", (url, id, hash) => {
+    expect(getVimeoVideo(url)).toEqual({ id, hash });
+  });
+
+  it("monta o embed do Vimeo sem som, em loop e sem controles", () => {
+    const embed = getEmbedUrl("https://vimeo.com/76979871/abc123ef")!;
+    expect(embed).toContain("player.vimeo.com/video/76979871");
+    expect(embed).toContain("background=1");
+    expect(embed).toContain("muted=1");
+    expect(embed).toContain("h=abc123ef");
+    expect(getEmbedUrl("https://exemplo.com/video")).toBeNull();
+  });
+
+  it("recusa link que a TV não consegue tocar com o tipo escolhido", () => {
+    const yt = "https://www.youtube.com/watch?v=abc";
+    expect(contentUrlProblem(AdvertisementType.EMBED_LINK, yt)).toBeNull();
+    expect(contentUrlProblem(AdvertisementType.EMBED_LINK, "https://exemplo.com/x")).not.toBeNull();
+    expect(contentUrlProblem(AdvertisementType.VIDEO_LINK, yt)).not.toBeNull();
+    expect(contentUrlProblem(AdvertisementType.VIDEO_LINK, "https://cdn.exemplo.com/a.mp4")).toBeNull();
   });
 });
 

@@ -3,6 +3,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAuthContext } from "@/lib/auth";
+import { contentUrlProblem } from "@/lib/ads/advertisement";
 import { ORDER_LIST_COLUMNS } from "@/lib/ads/queries";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
@@ -22,10 +23,21 @@ import {
   AdvertisementStatus,
   AdvertisementType,
   OverlayPosition,
+  UserRole,
   type OrderListAd,
 } from "@/types";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+
+const NOT_ADMIN = "Apenas administradores podem alterar anúncios.";
+
+/** Só ADMIN configura anúncios e mídias (o RLS do banco aplica a mesma regra). */
+async function getAdminContext() {
+  const ctx = await getAuthContext();
+  if (!ctx) return { ctx: null, error: "Não autenticado." } as const;
+  if (ctx.role !== UserRole.ADMIN) return { ctx: null, error: NOT_ADMIN } as const;
+  return { ctx, error: null } as const;
+}
 
 /** Sincroniza os vínculos anúncio↔empresa adicionando antes de remover (nunca fica sem vínculo). */
 async function syncCompanyLinks(
@@ -169,6 +181,21 @@ const actionSchema = z
     }
   )
 
+  // Link que a TV consegue tocar com o tipo escolhido
+  .superRefine((data, ctx) => {
+    const problem =
+      data.content_url && isHttpUrl(data.content_url)
+        ? contentUrlProblem(data.type, data.content_url)
+        : null;
+    if (problem) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["content_url"],
+        message: problem,
+      });
+    }
+  })
+
   // Thumbnail OPCIONAL: valide apenas se enviada
   .superRefine((data, ctx) => {
     if (data.thumbnail_url) {
@@ -192,9 +219,8 @@ export async function createAdvertisement(data: ActionInput) {
     return { success: false, message: validation.error.flatten().fieldErrors };
   }
 
-  const ctx = await getAuthContext();
-  if (!ctx)
-    return { success: false, message: { _server: ["Não autenticado"] } };
+  const { ctx, error: authError } = await getAdminContext();
+  if (!ctx) return { success: false, message: { _server: [authError] } };
   const { supabase, user } = ctx;
 
   const { company_ids, ...fields } = validation.data;
@@ -241,9 +267,8 @@ export async function updateAdvertisement(data: ActionInput) {
     return { success: false, message: validation.error.flatten().fieldErrors };
   }
 
-  const ctx = await getAuthContext();
-  if (!ctx)
-    return { success: false, message: { _server: ["Não autenticado"] } };
+  const { ctx, error: authError } = await getAdminContext();
+  if (!ctx) return { success: false, message: { _server: [authError] } };
   const { supabase, user } = ctx;
 
   const { id, company_ids, ...fields } = validation.data;
@@ -296,8 +321,8 @@ export async function updateAdvertisement(data: ActionInput) {
 
 // ACTION PARA ELIMINAR ANÚNCIO
 export async function deleteAdvertisement(adId: string) {
-  const ctx = await getAuthContext();
-  if (!ctx) return { success: false, message: "Não autenticado." };
+  const { ctx, error: authError } = await getAdminContext();
+  if (!ctx) return { success: false, message: authError };
   if (!adId) return { success: false, message: "ID do anúncio não fornecido." };
   const { supabase } = ctx;
 
@@ -340,8 +365,8 @@ export async function getSignedUploadUrl({
   fileType: string;
   fileSize: number;
 }) {
-  const ctx = await getAuthContext();
-  if (!ctx) return { success: false, message: "Não autenticado." };
+  const { ctx, error: authError } = await getAdminContext();
+  if (!ctx) return { success: false, message: authError };
 
   const invalid = validateUploadFile({ type: fileType, size: fileSize });
   if (invalid) return { success: false, message: invalid };
@@ -373,15 +398,18 @@ export async function getSignedUploadUrl({
  * Só apaga arquivos da pasta do próprio usuário e que nenhum anúncio esteja usando.
  */
 export async function discardUploads(urls: string[]) {
-  const ctx = await getAuthContext();
-  if (!ctx) return { success: false, message: "Não autenticado." };
+  const { ctx, error: authError } = await getAdminContext();
+  if (!ctx) return { success: false, message: authError };
 
   const candidates = Array.from(new Set(urls)).slice(0, 10);
   const paths = candidates
     .map((url) => ({ url, path: extractStoragePathFromPublicUrl(url) }))
     .filter(
       (item): item is { url: string; path: string } =>
-        !!item.path && item.path.startsWith(`${ctx.user.id}/`)
+        !!item.path &&
+        item.path.startsWith(`${ctx.user.id}/`) &&
+        // "uid/../outro" sairia da pasta do usuário
+        !item.path.split("/").some((part) => part === ".." || part === ".")
     );
   if (paths.length === 0) return { success: true, message: "Nada a remover." };
 
@@ -398,8 +426,8 @@ export async function reorderAdvertisements(ids: string[]) {
   const parsed = z.array(z.string().uuid()).min(1).max(1000).safeParse(ids);
   if (!parsed.success) return { success: false, message: "Lista inválida." };
 
-  const ctx = await getAuthContext();
-  if (!ctx) return { success: false, message: "Não autenticado." };
+  const { ctx, error: authError } = await getAdminContext();
+  if (!ctx) return { success: false, message: authError };
 
   const { error } = await ctx.supabase.rpc("reorder_advertisements", {
     p_ids: parsed.data,
@@ -426,8 +454,8 @@ export async function setAdvertisementsStatus(
     return { success: false, message: "Seleção inválida." };
   }
 
-  const ctx = await getAuthContext();
-  if (!ctx) return { success: false, message: "Não autenticado." };
+  const { ctx, error: authError } = await getAdminContext();
+  if (!ctx) return { success: false, message: authError };
 
   const { error } = await ctx.supabase
     .from("advertisements")
@@ -448,8 +476,8 @@ export async function deleteAdvertisements(ids: string[]) {
   const parsed = idsSchema.safeParse(ids);
   if (!parsed.success) return { success: false, message: "Seleção inválida." };
 
-  const ctx = await getAuthContext();
-  if (!ctx) return { success: false, message: "Não autenticado." };
+  const { ctx, error: authError } = await getAdminContext();
+  if (!ctx) return { success: false, message: authError };
 
   try {
     const { data: ads, error: fetchErr } = await ctx.supabase

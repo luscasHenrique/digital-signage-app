@@ -12,7 +12,7 @@ import { Table, type TableColumn } from "@/components/ui/Table/Table";
 import { TextField } from "@/components/ui/TextField/TextField";
 import {
   formatDuration,
-  type aggregatePlays,
+  type buildPlayReport,
   type PlayReportLine,
 } from "@/lib/ads/play-report";
 import type { Company } from "@/types";
@@ -22,7 +22,7 @@ interface ReportsClientProps {
   to: string;
   companyId: string;
   companies: Company[];
-  report: ReturnType<typeof aggregatePlays>;
+  report: ReturnType<typeof buildPlayReport>;
 }
 
 const ALL = "all";

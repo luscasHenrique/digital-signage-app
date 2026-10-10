@@ -7,7 +7,9 @@ import {
   getCompanies,
   parseAdsSearchParams,
 } from "@/lib/ads/queries";
+import { getPageAuthContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { UserRole } from "@/types";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Anúncios da empresa" };
@@ -29,6 +31,7 @@ export default async function CompanyAdsPage({
   // ID malformado faria a consulta falhar com erro 500 em vez de 404
   if (!UUID_PATTERN.test(companyId)) notFound();
   const supabase = createClient();
+  const ctx = await getPageAuthContext();
 
   // A lista de empresas também alimenta o formulário (vincular a outras telas)
   const [companies, { ads, total }] = await Promise.all([
@@ -49,6 +52,7 @@ export default async function CompanyAdsPage({
       perPage={ADS_PER_PAGE}
       filters={filters}
       companies={companies}
+      canEdit={ctx?.role === UserRole.ADMIN}
       title={`Anúncios · ${company.name}`}
       description={`Anúncios exibidos na tela /display/${company.slug}.`}
       defaultCompanyId={company.id}

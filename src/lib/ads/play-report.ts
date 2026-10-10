@@ -1,13 +1,17 @@
 // src/lib/ads/play-report.ts
 // Agrega as linhas de ad_play_stats para a página de relatório.
 
-export type PlayStatRow = {
-  day: string;
-  plays: number;
+/** Linha devolvida por ad_play_report (já somada por anúncio + empresa). */
+export type PlayReportRow = {
   advertisement_id: string;
   company_id: string;
-  advertisement: { title: string; duration_seconds: number } | null;
-  company: { name: string } | null;
+  /** Título atual, ou o guardado na época se o anúncio foi excluído */
+  ad_title: string | null;
+  company_name: string | null;
+  ad_deleted: boolean;
+  plays: number;
+  /** Segundos de tela (exibições x duração configurada) */
+  seconds: number;
 };
 
 export type PlayReportLine = {
@@ -19,26 +23,24 @@ export type PlayReportLine = {
   seconds: number;
 };
 
-export function aggregatePlays(rows: PlayStatRow[]) {
-  const lines = new Map<string, PlayReportLine>();
-  for (const row of rows) {
-    const key = `${row.advertisement_id}|${row.company_id}`;
-    const line = lines.get(key) ?? {
-      key,
-      adTitle: row.advertisement?.title ?? "Anúncio excluído",
-      companyName: row.company?.name ?? "Empresa excluída",
-      plays: 0,
-      seconds: 0,
-    };
-    line.plays += row.plays;
-    line.seconds += row.plays * (row.advertisement?.duration_seconds ?? 0);
-    lines.set(key, line);
-  }
-  const sorted = [...lines.values()].sort((a, b) => b.plays - a.plays);
+export function buildPlayReport(rows: PlayReportRow[]) {
+  const lines: PlayReportLine[] = rows
+    .map((row) => {
+      const title = row.ad_title ?? "Anúncio sem título";
+      return {
+        key: `${row.advertisement_id}|${row.company_id}`,
+        adTitle: row.ad_deleted ? `${title} (excluído)` : title,
+        companyName: row.company_name ?? "Empresa excluída",
+        // bigint do Postgres pode chegar como string
+        plays: Number(row.plays),
+        seconds: Number(row.seconds),
+      };
+    })
+    .sort((a, b) => b.plays - a.plays);
   return {
-    lines: sorted,
-    totalPlays: sorted.reduce((sum, l) => sum + l.plays, 0),
-    totalSeconds: sorted.reduce((sum, l) => sum + l.seconds, 0),
+    lines,
+    totalPlays: lines.reduce((sum, l) => sum + l.plays, 0),
+    totalSeconds: lines.reduce((sum, l) => sum + l.seconds, 0),
     ads: new Set(rows.map((r) => r.advertisement_id)).size,
   };
 }

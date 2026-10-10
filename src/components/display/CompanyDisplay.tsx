@@ -3,29 +3,36 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getYoutubeEmbedUrl } from "@/lib/ads/advertisement";
+import { getEmbedUrl } from "@/lib/ads/advertisement";
 import { isPlayableNow } from "@/lib/ads/weekly-schedule";
 import { reportClientError } from "@/lib/errors/reporter";
 import { isOptimizableImage } from "@/lib/storage";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeScope } from "@/components/ui/Theme/ThemeScope";
-import { AdvertisementType, OverlayPosition, type DisplayAd } from "@/types";
+import {
+  AdvertisementType,
+  OverlayPosition,
+  type DisplayAd,
+  type DisplaySettings,
+  type DisplayTransition,
+} from "@/types";
 import { DisplayClock } from "./DisplayClock";
 import { FullscreenButton } from "./FullscreenButton";
 import {
   useIdle,
   useOfflineSupport,
+  useOnline,
   usePlayStatsFlush,
   useWakeLock,
 } from "./hooks";
 import { addPlay, loadCounts, saveCounts } from "./play-counter";
 import styles from "./CompanyDisplay.module.css";
 
-type AnimationType = "fade" | "slideFromRight" | "zoomIn";
+type AnimationType = DisplayTransition;
 
 interface CompanyDisplayProps {
   ads: DisplayAd[];
-  animationType?: AnimationType;
+  settings: DisplaySettings;
   companyId: string;
   slug: string;
 }
@@ -45,14 +52,18 @@ const TRANSITION_MS = 1000;
 
 export function CompanyDisplay({
   ads,
-  animationType = "fade",
+  settings: initialSettings,
   companyId,
   slug,
 }: CompanyDisplayProps) {
+  // Transição e relógio: o painel pode mudar com a tela no ar
+  const [settings, setSettings] = useState<DisplaySettings>(initialSettings);
+  const animationType = settings.transition;
   // Lista vinda do servidor; a playlist é o que pode passar agora
   const [allAds, setAllAds] = useState<DisplayAd[]>(ads);
   const [clock, setClock] = useState(() => Date.now());
-  const adList = usePlaylist(allAds, clock);
+  const online = useOnline();
+  const adList = usePlaylist(allAds, clock, online);
   const [currentIndex, setCurrentIndex] = useState(0);
   // Slide que está saindo: fica na tela durante a animação de troca
   const [leaving, setLeaving] = useState<DisplayAd | null>(null);
@@ -74,6 +85,8 @@ export function CompanyDisplay({
     setAllAds(ads);
     setCurrentIndex(0);
   }, [ads]);
+
+  useEffect(() => setSettings(initialSettings), [initialSettings]);
 
   // Programação semanal: a playlist muda sozinha ao entrar/sair do horário
   useEffect(() => {
@@ -194,8 +207,19 @@ export function CompanyDisplay({
       }
 
       etagRef.current = res.headers.get("ETag");
-      const { ads: list } = (await res.json()) as { ads: DisplayAd[] };
+      const { ads: list, settings: next } = (await res.json()) as {
+        ads: DisplayAd[];
+        settings?: DisplaySettings;
+      };
       setAllAds((current) => (sameAds(current, list) ? current : list));
+      if (next) {
+        setSettings((current) =>
+          current.transition === next.transition &&
+          current.showClock === next.showClock
+            ? current
+            : next
+        );
+      }
       return true;
     } catch (error) {
       // Falha de rede: mantém a lista atual na tela.
@@ -205,16 +229,27 @@ export function CompanyDisplay({
   }, [slug]);
 
   // Agrupa rajadas de eventos do Realtime num único refetch
-  const debouncedRefetch = useMemo(() => {
-    let t: ReturnType<typeof setTimeout> | null = null;
-    return () => {
-      if (t) clearTimeout(t);
-      t = setTimeout(() => {
-        refetch();
-        t = null;
-      }, 300);
-    };
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedRefetch = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      debounceRef.current = null;
+      void refetch();
+    }, 300);
   }, [refetch]);
+  useEffect(
+    () => () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    },
+    []
+  );
+
+  // Internet voltou: atualiza a lista na hora (sem esperar o próximo ciclo)
+  const wasOnlineRef = useRef(true);
+  useEffect(() => {
+    if (online && !wasOnlineRef.current) void refetch();
+    wasOnlineRef.current = online;
+  }, [online, refetch]);
 
   // Realtime: a tabela display_signals recebe um "toque" (via trigger no banco)
   // sempre que anúncios ou vínculos desta empresa mudam. Só expõe company_id/updated_at.
@@ -315,9 +350,11 @@ export function CompanyDisplay({
           <p className={styles.empty}>Nenhum anúncio ativo no momento.</p>
         )}
 
-        <div className={styles.clock}>
-          <DisplayClock />
-        </div>
+        {settings.showClock && (
+          <div className={styles.clock}>
+            <DisplayClock />
+          </div>
+        )}
 
         <FullscreenButton targetId="fullscreen-display" hidden={idle} />
       </main>
@@ -444,14 +481,15 @@ function AdContent({
     );
   }
 
-  const embedUrl = getYoutubeEmbedUrl(ad.content_url);
+  const embedUrl = getEmbedUrl(ad.content_url);
   if (embedUrl) {
     return (
       <iframe
         src={embedUrl}
         title={ad.title}
         className="size-full border-0"
-        allow="autoplay; encrypted-media; picture-in-picture"
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+        referrerPolicy="strict-origin-when-cross-origin"
       />
     );
   }
@@ -462,18 +500,29 @@ function AdContent({
 /**
  * Anúncios que podem passar agora (período + dias/horários). Mantém a mesma
  * referência enquanto o conteúdo não muda, para não reiniciar o slideshow.
+ * Sem internet, YouTube/Vimeo não carregam: saem da fila enquanto houver
+ * outros anúncios (imagens e vídeos enviados ficam no cache da TV).
  */
-function usePlaylist(ads: DisplayAd[], clock: number): DisplayAd[] {
+function usePlaylist(
+  ads: DisplayAd[],
+  clock: number,
+  online: boolean
+): DisplayAd[] {
   const previous = useRef<DisplayAd[]>([]);
   return useMemo(() => {
     const now = new Date(clock);
-    const next = ads.filter((ad) => isPlayableNow(ad, now));
+    const playable = ads.filter((ad) => isPlayableNow(ad, now));
+    const offlineReady = playable.filter(
+      (ad) => ad.type !== AdvertisementType.EMBED_LINK
+    );
+    const next =
+      online || offlineReady.length === 0 ? playable : offlineReady;
     const same =
       next.length === previous.current.length &&
       next.every((ad, i) => ad === previous.current[i]);
     if (!same) previous.current = next;
     return previous.current;
-  }, [ads, clock]);
+  }, [ads, clock, online]);
 }
 
 /** Evita reiniciar o slideshow quando o refetch traz exatamente os mesmos anúncios. */

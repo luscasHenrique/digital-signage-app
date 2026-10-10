@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AdvertisementStatus, AdvertisementType } from "@/types";
+import { AdvertisementStatus, AdvertisementType, UserRole } from "@/types";
 import { fakeClient } from "./helpers/fake-supabase";
 
 // Host do Supabase usado para reconhecer arquivos do próprio bucket
@@ -93,6 +93,7 @@ describe("limpeza do Storage", () => {
     });
     mocks.getAuthContext.mockResolvedValue({
       user: { id: "eu" },
+      role: UserRole.ADMIN,
       supabase: client,
     });
     adminUsage([], []);
@@ -105,7 +106,7 @@ describe("limpeza do Storage", () => {
   });
 
   it("não apaga arquivo que outro anúncio ainda usa", async () => {
-    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" } });
+    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" }, role: UserRole.ADMIN });
     const usado = `${STORAGE}/eu/usado.png`;
     const livre = `${STORAGE}/eu/livre.png`;
     adminUsage([usado], []);
@@ -115,9 +116,12 @@ describe("limpeza do Storage", () => {
   });
 
   it("descartar uploads ignora arquivos de outros usuários", async () => {
-    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" } });
+    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" }, role: UserRole.ADMIN });
 
-    const result = await discardUploads([`${STORAGE}/outro/a.png`]);
+    const result = await discardUploads([
+      `${STORAGE}/outro/a.png`,
+      `${STORAGE}/eu%2F..%2Foutro/b.png`,
+    ]);
     expect(result.message).toBe("Nada a remover.");
     expect(mocks.storageRemove).not.toHaveBeenCalled();
   });
@@ -143,7 +147,7 @@ describe("ações em lote", () => {
 
   it("altera o status de todos os selecionados numa consulta", async () => {
     const { client, log } = fakeClient({ advertisements: [{}] });
-    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" }, supabase: client });
+    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" }, role: UserRole.ADMIN, supabase: client });
 
     const result = await setAdvertisementsStatus([ID1, ID2], AdvertisementStatus.INACTIVE);
     expect(result).toEqual({ success: true, message: "2 anúncio(s) desativado(s)." });
@@ -157,12 +161,36 @@ describe("ações em lote", () => {
         {},
       ],
     });
-    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" }, supabase: client });
+    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" }, role: UserRole.ADMIN, supabase: client });
     const admin = fakeClient({ advertisements: [{ data: [] }, { data: [] }] });
     mocks.adminFrom.mockImplementation(admin.client.from);
 
     const result = await deleteAdvertisements([ID1]);
     expect(result.success).toBe(true);
     expect(mocks.storageRemove).toHaveBeenCalledWith(["u/a.png"]);
+  });
+});
+
+describe("permissões", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("usuário STANDARD não altera anúncios", async () => {
+    const { client, log } = fakeClient();
+    mocks.getAuthContext.mockResolvedValue({
+      user: { id: "eu" },
+      role: UserRole.STANDARD,
+      supabase: client,
+    });
+    const id = "11111111-1111-4111-8111-111111111111";
+
+    const results = await Promise.all([
+      createAdvertisement({ ...base, content_url: "https://exemplo.com/a.png" }),
+      deleteAdvertisement(id),
+      deleteAdvertisements([id]),
+      setAdvertisementsStatus([id], AdvertisementStatus.INACTIVE),
+    ]);
+
+    for (const result of results) expect(result.success).toBe(false);
+    expect(log).toHaveLength(0);
   });
 });

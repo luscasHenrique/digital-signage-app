@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  displaySettings,
   getActiveAdsForCompany,
   getDisplayCompany,
   hasDisplayAccess,
@@ -34,7 +35,7 @@ export async function GET(
       getActiveAdsForCompany(company.id),
       recordDisplayHeartbeat(company.id, request.headers.get("user-agent")),
     ]);
-    const body = JSON.stringify({ ads });
+    const body = JSON.stringify({ ads, settings: displaySettings(company) });
     // O player consulta a cada 30 s; se nada mudou, responde 304 sem corpo.
     const etag = `"${createHash("sha1").update(body).digest("base64url")}"`;
     const headers = { "Cache-Control": "no-store", ETag: etag };

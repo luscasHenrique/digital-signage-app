@@ -63,6 +63,8 @@ interface AdvertisementsClientProps {
   description?: string;
   /** Empresa já marcada ao criar um anúncio por aqui */
   defaultCompanyId?: string;
+  /** Só ADMIN cria, edita, ordena e exclui anúncios */
+  canEdit: boolean;
 }
 
 // "Fora do horário" entra em "No ar" (dias/horários são aplicados na tela)
@@ -86,6 +88,7 @@ export function AdvertisementsClient({
   title = "Anúncios",
   description = "Crie, edite e agende o conteúdo das suas telas.",
   defaultCompanyId,
+  canEdit,
 }: AdvertisementsClientProps) {
   const toast = useToast();
   const router = useRouter();
@@ -189,7 +192,7 @@ export function AdvertisementsClient({
     },
   ];
 
-  const columns: TableColumn<AdvertisementWithCompanies>[] = [
+  const allColumns: TableColumn<AdvertisementWithCompanies>[] = [
     {
       key: "title",
       header: "Anúncio",
@@ -254,6 +257,9 @@ export function AdvertisementsClient({
       cell: (ad) => <RowActions items={actionsFor(ad)} />,
     },
   ];
+  const columns = canEdit
+    ? allColumns
+    : allColumns.filter((column) => column.key !== "actions");
 
   const bulkActions = selectedIds.length > 0 && (
     <div
@@ -359,17 +365,24 @@ export function AdvertisementsClient({
                 { value: "table", icon: <List />, ariaLabel: "Tabela" },
               ]}
             />
-            <Button
-              variant="secondary"
-              leftIcon={<ArrowUpDown />}
-              onClick={() => setIsReorderOpen(true)}
-              disabled={!hasFilters && total < 2}
-            >
-              Ordem
-            </Button>
-            <Button leftIcon={<Plus />} onClick={() => handleOpenModal(null)}>
-              Novo anúncio
-            </Button>
+            {canEdit && (
+              <>
+                <Button
+                  variant="secondary"
+                  leftIcon={<ArrowUpDown />}
+                  onClick={() => setIsReorderOpen(true)}
+                  disabled={!hasFilters && total < 2}
+                >
+                  Ordem
+                </Button>
+                <Button
+                  leftIcon={<Plus />}
+                  onClick={() => handleOpenModal(null)}
+                >
+                  Novo anúncio
+                </Button>
+              </>
+            )}
           </>
         }
       />
@@ -383,9 +396,15 @@ export function AdvertisementsClient({
                 <AdvertisementsCard
                   key={ad.id}
                   anuncio={ad}
-                  onEdit={(item) => handleOpenModal(item)}
-                  onDuplicate={(item) => handleOpenModal(item, true)}
-                  onDelete={setAdToDelete}
+                  actions={
+                    canEdit
+                      ? {
+                          onEdit: (item) => handleOpenModal(item),
+                          onDuplicate: (item) => handleOpenModal(item, true),
+                          onDelete: setAdToDelete,
+                        }
+                      : undefined
+                  }
                 />
               ))}
             </div>
@@ -399,7 +418,7 @@ export function AdvertisementsClient({
                 <Megaphone size={22} />
               </span>
               <p className="text-muted-foreground">{emptyMessage}</p>
-              {!hasFilters && (
+              {!hasFilters && canEdit && (
                 <Button
                   leftIcon={<Plus />}
                   onClick={() => handleOpenModal(null)}
@@ -416,7 +435,7 @@ export function AdvertisementsClient({
           data={filtered}
           rowKey={(ad) => ad.id}
           loading={isNavigating}
-          selectable
+          selectable={canEdit}
           selected={selectedIds}
           onSelectedChange={setSelected}
           toolbar={

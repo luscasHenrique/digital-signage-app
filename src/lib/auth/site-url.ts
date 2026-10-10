@@ -19,8 +19,14 @@ export async function getSiteOrigin(): Promise<string> {
   return `${proto}://${host}`;
 }
 
-/** Só caminhos internos ("/dashboard"), nunca "//outro-site" ou URLs absolutas. */
+/**
+ * Só caminhos internos ("/dashboard"), nunca "//outro-site" ou URLs absolutas.
+ * O navegador trata "\" como "/", então "/\evil.com" também é recusado.
+ */
 export function safeRedirectPath(value: string | null, fallback = "/dashboard") {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return fallback;
-  return value;
+  if (!value || !value.startsWith("/") || /[\\\s]/.test(value)) return fallback;
+  const base = "http://interno.invalid";
+  const url = new URL(value, base);
+  if (url.origin !== base) return fallback;
+  return `${url.pathname}${url.search}${url.hash}`;
 }

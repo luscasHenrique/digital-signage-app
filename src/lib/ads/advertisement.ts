@@ -34,8 +34,71 @@ export function getYoutubeThumbnailUrl(url: string): string | null {
 export function getYoutubeEmbedUrl(url: string): string | null {
   const id = getYoutubeVideoId(url);
   return id
-    ? `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&rel=0`
+    ? `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&rel=0&playsinline=1&iv_load_policy=3&disablekb=1`
     : null;
+}
+
+/** ID (e hash de vídeo não listado) de um link do Vimeo. */
+export function getVimeoVideo(
+  url: string | null | undefined
+): { id: string; hash: string | null } | null {
+  try {
+    if (!url) return null;
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, "");
+    if (host === "player.vimeo.com") {
+      const match = u.pathname.match(/^\/video\/(\d+)/);
+      return match ? { id: match[1], hash: u.searchParams.get("h") } : null;
+    }
+    if (host !== "vimeo.com") return null;
+    // vimeo.com/123, vimeo.com/123/abcdef (não listado), vimeo.com/channels/x/123
+    const parts = u.pathname.split("/").filter(Boolean);
+    const index = parts.findIndex((part) => /^\d+$/.test(part));
+    if (index < 0) return null;
+    const hash = parts[index + 1];
+    return {
+      id: parts[index],
+      hash: hash && /^[0-9a-f]+$/i.test(hash) ? hash : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Embed do Vimeo em modo "background": sem som, sem controles, em loop. */
+export function getVimeoEmbedUrl(url: string): string | null {
+  const video = getVimeoVideo(url);
+  if (!video) return null;
+  const hash = video.hash ? `&h=${video.hash}` : "";
+  return `https://player.vimeo.com/video/${video.id}?background=1&autoplay=1&muted=1&loop=1${hash}`;
+}
+
+/** Embed de vídeo para a tela (YouTube ou Vimeo); null se o link não for suportado. */
+export function getEmbedUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  return getYoutubeEmbedUrl(url) ?? getVimeoEmbedUrl(url);
+}
+
+/**
+ * Confere se o link combina com o tipo escolhido (null = ok). Evita salvar um
+ * anúncio que a TV não consegue tocar, como um link do YouTube em "Vídeo (link)".
+ */
+export function contentUrlProblem(
+  type: AdvertisementType,
+  url: string
+): string | null {
+  const isEmbed = !!getEmbedUrl(url);
+  if (type === AdvertisementType.EMBED_LINK && !isEmbed) {
+    return "Use um link de vídeo do YouTube ou do Vimeo.";
+  }
+  if (
+    (type === AdvertisementType.VIDEO_LINK ||
+      type === AdvertisementType.IMAGE_LINK) &&
+    isEmbed
+  ) {
+    return "Links do YouTube/Vimeo usam o tipo \"YouTube / Vimeo\".";
+  }
+  return null;
 }
 
 export type AdSchedule =
@@ -70,7 +133,7 @@ export const AD_TYPE_LABEL: Record<AdvertisementType, string> = {
   [AdvertisementType.VIDEO_UPLOAD]: "Vídeo (arquivo)",
   [AdvertisementType.IMAGE_LINK]: "Imagem (link)",
   [AdvertisementType.VIDEO_LINK]: "Vídeo (link .mp4)",
-  [AdvertisementType.EMBED_LINK]: "YouTube",
+  [AdvertisementType.EMBED_LINK]: "YouTube / Vimeo",
 };
 
 export function isUploadType(type: AdvertisementType | undefined): boolean {

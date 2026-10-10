@@ -90,13 +90,15 @@ As migrações ficam em `supabase/migrations/` e são aplicadas em produção co
 
 | Migração | Conteúdo | Produção |
 |---|---|---|
-| `20251001000000_baseline_schema` | Tabelas, funções, triggers, RLS, bucket e Realtime de produção | Marcar como aplicada |
+| `20251001000000_baseline_schema` | Tabelas, funções, triggers, RLS, bucket e Realtime de produção | ✅ Aplicada |
 | `20261006000000_security_hardening` | `display_signals`, anon sem acesso, `password` ilegível, `role` protegido, limites do bucket | ✅ Aplicada |
-| `20261006120000_rate_limit_and_indexes` | Limite de tentativas no banco + índices | ⏳ Pendente |
-| `20261007000000_policies_cleanup_and_status_fix` | `profiles` fechado para visitantes, políticas antigas removidas, `audit_logs` só por trigger, status manual (remove o trigger e o job que reativavam anúncios), auditoria de empresas | ⏳ Pendente |
-| `20261007120000_display_features` | `position`, `weekdays`/`daily_start`/`daily_end`, `companies.transition`, `display_heartbeats` | ⏳ Pendente |
-| `20261007180000_play_stats` | `ad_play_stats` + `record_ad_plays` | ⏳ Pendente |
-| `20261008000000_error_logs` | `error_logs` (monitoramento de erros) | ⏳ Pendente |
+| `20261006120000_rate_limit_and_indexes` | Limite de tentativas no banco + índices | ✅ Aplicada |
+| `20261007000000_policies_cleanup_and_status_fix` | `profiles` fechado para visitantes, políticas antigas removidas, `audit_logs` só por trigger, status manual (remove o trigger e o job que reativavam anúncios), auditoria de empresas | ✅ Aplicada |
+| `20261007120000_display_features` | `position`, `weekdays`/`daily_start`/`daily_end`, `companies.transition`, `display_heartbeats` | ✅ Aplicada |
+| `20261007180000_play_stats` | `ad_play_stats` + `record_ad_plays` | ✅ Aplicada |
+| `20261008000000_error_logs` | `error_logs` (monitoramento de erros) | ✅ Aplicada |
+| `20261009000000_admin_only_and_display_clock` | Escrita em empresas, anúncios e mídias só para ADMIN; `companies.show_clock`; TV avisada quando a empresa muda; exibições de até 30 dias | ⏳ Pendente |
+| `20261009120000_play_stats_history` | Histórico do relatório mantido ao excluir anúncio (título guardado); relatório somado no banco (`ad_play_report`) | ⏳ Pendente |
 
 > **Ordem de publicação:** aplicar as migrações **antes** de publicar o código. A partir do commit `6e5d228`, o código usa colunas e tabelas que só existem depois delas.
 
@@ -164,7 +166,7 @@ A interface usa o design system [liquid-glass-ui](https://github.com/luscasHenri
 |---|---|---|
 | `/`, `/login`, `/recuperar-senha` | Público | Início, login e pedido de nova senha |
 | `/auth/callback` | Público | Valida o link do e-mail (só redireciona para caminhos internos) |
-| `/dashboard/...` (anúncios, empresas, relatórios, conta) | Logado | Painel |
+| `/dashboard/...` (anúncios, empresas, relatórios, conta) | Logado (STANDARD só consulta; criar, editar, ordenar e excluir é só ADMIN) | Painel |
 | `/dashboard/admin/usuarios`, `/dashboard/admin/auditoria` | **Só ADMIN** (os demais recebem 404) | Administração |
 | `/display/[slug]` | Público, ou cookie válido se a empresa for privada | Player |
 | `/display/[slug]/auth` | Público | Senha da empresa privada |
@@ -175,11 +177,11 @@ A interface usa o design system [liquid-glass-ui](https://github.com/luscasHenri
 Camadas de autorização:
 - **middleware:** sessão em `/dashboard/*` via `getUser()`;
 - **páginas admin:** `requireAdminPage()`;
-- **Server Actions:** `getAuthContext()`;
+- **Server Actions:** `getAuthContext()`; as de empresas e anúncios exigem ADMIN;
 - **display:** `hasDisplayAccess()`;
 - **banco:** RLS e grants de coluna.
 
-**Headers de segurança:** CSP (scripts só do próprio site; imagens e vídeos de qualquer `https`, porque anúncios podem usar links externos; conexão só com o Supabase; iframes só do YouTube), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy` e HSTS. O `robots.txt` bloqueia indexação, e as telas têm `noindex`.
+**Headers de segurança:** CSP (scripts só do próprio site; imagens e vídeos de qualquer `https`, porque anúncios podem usar links externos; conexão só com o Supabase; iframes só do YouTube e do Vimeo), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy` e HSTS. O `robots.txt` bloqueia indexação, e as telas têm `noindex`.
 
 ---
 
@@ -212,8 +214,8 @@ Storage: bucket público "advertisements", caminho <user_id>/<timestamp>-<nome>
 | Tabela | anon | authenticated | Escrita |
 |---|---|---|---|
 | `profiles` | — | lê todos; altera só `full_name`/`avatar_url` do próprio | admin via service role |
-| `companies` | — | lê as colunas públicas (sem `password`), CRUD | — |
-| `advertisements`, `advertisements_companies` | — | CRUD | — |
+| `companies` | — | lê as colunas públicas (sem `password`) | só ADMIN |
+| `advertisements`, `advertisements_companies` | — | lê | só ADMIN |
 | `display_signals` | lê | lê | triggers |
 | `display_heartbeats`, `ad_play_stats` | — | lê | servidor (service role) |
 | `audit_logs` | — | só ADMIN lê | triggers |

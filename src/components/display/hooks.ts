@@ -3,11 +3,30 @@
 
 import { useEffect, useState } from "react";
 import {
+  dropExpired,
   loadCounts,
+  nextBatch,
   saveCounts,
   subtractSent,
-  toPayload,
 } from "./play-counter";
+
+/** Estado da conexão do aparelho (eventos online/offline do navegador). */
+export function useOnline(): boolean {
+  const [online, setOnline] = useState(true);
+
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+
+  return online;
+}
 
 /** true quando o mouse/teclado fica parado por `timeoutMs`. */
 export function useIdle(timeoutMs: number): boolean {
@@ -43,22 +62,28 @@ export function usePlayStatsFlush(slug: string) {
     let sending = false;
 
     const flush = async () => {
-      const counts = loadCounts(slug);
-      const items = toPayload(counts);
-      if (sending || items.length === 0) return;
+      if (sending) return;
       sending = true;
       try {
-        const res = await fetch(
-          `/api/display/${encodeURIComponent(slug)}/plays`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ items }),
-            // Continua mesmo se a página estiver sendo fechada
-            keepalive: true,
-          }
-        );
-        if (res.ok) saveCounts(slug, subtractSent(loadCounts(slug), counts));
+        saveCounts(slug, dropExpired(loadCounts(slug), new Date()));
+        // Depois de muitos dias offline a fila pode passar do limite da API:
+        // envia em lotes até esvaziar (ou até a rede falhar)
+        for (let round = 0; round < 20; round++) {
+          const { items, sent } = nextBatch(loadCounts(slug));
+          if (items.length === 0) break;
+          const res = await fetch(
+            `/api/display/${encodeURIComponent(slug)}/plays`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ items }),
+              // Continua mesmo se a página estiver sendo fechada
+              keepalive: true,
+            }
+          );
+          if (!res.ok) break;
+          saveCounts(slug, subtractSent(loadCounts(slug), sent));
+        }
       } catch {
         // Sem rede: tenta de novo no próximo ciclo
       } finally {

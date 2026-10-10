@@ -19,29 +19,27 @@ import { AdvertisementPreview } from "./AdvertisementPreview";
 import type { AdvertisementWithCompanies } from "@/types";
 import { ScheduleBadge } from "./ScheduleBadge";
 
+type AdHandler = (anuncio: AdvertisementWithCompanies) => void;
+
 interface AdvertisementsCardProps {
   anuncio: AdvertisementWithCompanies;
-  onEdit: (anuncio: AdvertisementWithCompanies) => void;
-  onDuplicate: (anuncio: AdvertisementWithCompanies) => void;
-  onDelete: (anuncio: AdvertisementWithCompanies) => void;
+  /** Sem ações (usuário sem permissão): o card só mostra o anúncio */
+  actions?: { onEdit: AdHandler; onDuplicate: AdHandler; onDelete: AdHandler };
 }
 
-export function AdvertisementsCard({
-  anuncio,
-  onEdit,
-  onDuplicate,
-  onDelete,
-}: AdvertisementsCardProps) {
+export function AdvertisementsCard({ anuncio, actions }: AdvertisementsCardProps) {
   const weekly = formatWeeklySchedule(anuncio);
   return (
     <Card
       padding="none"
       radius="lg"
-      interactive
-      className="flex cursor-pointer flex-col overflow-hidden"
+      interactive={!!actions}
+      className={`flex flex-col overflow-hidden${actions ? " cursor-pointer" : ""}`}
       onClick={(e) => {
         // Cliques no menu (renderizado em Portal) também sobem até aqui
-        if (e.currentTarget.contains(e.target as Node)) onEdit(anuncio);
+        if (actions && e.currentTarget.contains(e.target as Node)) {
+          actions.onEdit(anuncio);
+        }
       }}
     >
       <div className="relative aspect-video bg-muted">
@@ -59,27 +57,29 @@ export function AdvertisementsCard({
           <h3 className="line-clamp-2 text-[length:var(--lg-text-md)] leading-snug">
             {anuncio.title}
           </h3>
-          <RowActions
-            items={[
-              {
-                label: "Editar",
-                icon: <Pencil />,
-                onSelect: () => onEdit(anuncio),
-              },
-              {
-                label: "Duplicar",
-                icon: <Copy />,
-                onSelect: () => onDuplicate(anuncio),
-              },
-              { type: "separator" },
-              {
-                label: "Excluir",
-                icon: <Trash2 />,
-                tone: "danger",
-                onSelect: () => onDelete(anuncio),
-              },
-            ]}
-          />
+          {actions && (
+            <RowActions
+              items={[
+                {
+                  label: "Editar",
+                  icon: <Pencil />,
+                  onSelect: () => actions.onEdit(anuncio),
+                },
+                {
+                  label: "Duplicar",
+                  icon: <Copy />,
+                  onSelect: () => actions.onDuplicate(anuncio),
+                },
+                { type: "separator" },
+                {
+                  label: "Excluir",
+                  icon: <Trash2 />,
+                  tone: "danger",
+                  onSelect: () => actions.onDelete(anuncio),
+                },
+              ]}
+            />
+          )}
         </div>
 
         <dl className="mt-auto flex flex-col gap-2 text-sm text-muted-foreground">

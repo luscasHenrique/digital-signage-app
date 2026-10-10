@@ -23,6 +23,28 @@ export function toPayload(counts: PlayCounts) {
   });
 }
 
+/** Contagens enviadas por vez (limite da API). */
+export const MAX_PAYLOAD_ITEMS = 500;
+/** O servidor só aceita dias recentes; mais antigo que isso é descartado. */
+export const MAX_PLAY_AGE_DAYS = 30;
+
+/** Próximo lote a enviar e as contagens que ele representa. */
+export function nextBatch(counts: PlayCounts) {
+  const entries = Object.entries(counts).slice(0, MAX_PAYLOAD_ITEMS);
+  const sent: PlayCounts = Object.fromEntries(entries);
+  return { items: toPayload(sent), sent };
+}
+
+/** Remove dias que o servidor não aceita mais (evita fila crescendo para sempre). */
+export function dropExpired(counts: PlayCounts, now: Date): PlayCounts {
+  const limit = playDay(new Date(now.getTime() - MAX_PLAY_AGE_DAYS * 86_400_000));
+  const next: PlayCounts = {};
+  for (const [key, value] of Object.entries(counts)) {
+    if (key.split("|")[0] >= limit) next[key] = value;
+  }
+  return next;
+}
+
 /** Desconta o que foi enviado (novas exibições podem ter entrado no meio). */
 export function subtractSent(current: PlayCounts, sent: PlayCounts): PlayCounts {
   const next: PlayCounts = {};

@@ -1,28 +1,28 @@
 import { describe, expect, it } from "vitest";
 import {
-  aggregatePlays,
+  buildPlayReport,
   formatDuration,
   parseDayParam,
-  type PlayStatRow,
+  type PlayReportRow,
 } from "@/lib/ads/play-report";
 
-const row = (over: Partial<PlayStatRow>): PlayStatRow => ({
-  day: "2026-10-07",
-  plays: 1,
+const row = (over: Partial<PlayReportRow>): PlayReportRow => ({
   advertisement_id: "a1",
   company_id: "c1",
-  advertisement: { title: "Promo", duration_seconds: 10 },
-  company: { name: "Loja" },
+  ad_title: "Promo",
+  company_name: "Loja",
+  ad_deleted: false,
+  plays: 1,
+  seconds: 10,
   ...over,
 });
 
-describe("aggregatePlays", () => {
-  it("soma por anúncio + empresa, ordena por exibições e calcula o tempo", () => {
-    const report = aggregatePlays([
-      row({ plays: 3 }),
-      row({ day: "2026-10-06", plays: 2 }),
-      row({ advertisement_id: "a2", plays: 10, advertisement: { title: "Outro", duration_seconds: 6 } }),
-      row({ company_id: "c2", company: { name: "Filial" }, plays: 1 }),
+describe("buildPlayReport", () => {
+  it("ordena por exibições e soma os totais", () => {
+    const report = buildPlayReport([
+      row({ plays: 5, seconds: 50 }),
+      row({ advertisement_id: "a2", ad_title: "Outro", plays: 10, seconds: 60 }),
+      row({ company_id: "c2", company_name: "Filial", plays: 1, seconds: 10 }),
     ]);
     expect(report.lines.map((l) => [l.adTitle, l.companyName, l.plays, l.seconds])).toEqual([
       ["Outro", "Loja", 10, 60],
@@ -32,6 +32,15 @@ describe("aggregatePlays", () => {
     expect(report.totalPlays).toBe(16);
     expect(report.totalSeconds).toBe(120);
     expect(report.ads).toBe(2);
+  });
+
+  it("mantém o histórico de anúncio excluído com o título da época", () => {
+    const report = buildPlayReport([
+      // bigint do Postgres pode chegar como texto
+      row({ ad_deleted: true, ad_title: "Black Friday", plays: "7" as unknown as number }),
+    ]);
+    expect(report.lines[0].adTitle).toBe("Black Friday (excluído)");
+    expect(report.totalPlays).toBe(7);
   });
 });
 

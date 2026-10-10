@@ -26,7 +26,11 @@ export function DisplayError({
   }, [seconds]);
 
   return (
-    <main className="grid h-dvh w-screen place-items-center bg-black text-center text-white">
+    // data-display-error: o service worker não guarda esta tela no lugar da página boa
+    <main
+      data-display-error
+      className="grid h-dvh w-screen place-items-center bg-black text-center text-white"
+    >
       <div className="flex flex-col gap-2">
         <p>{message}</p>
         <p className="text-sm text-white/60">
