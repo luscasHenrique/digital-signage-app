@@ -97,8 +97,9 @@ As migrações ficam em `supabase/migrations/` e são aplicadas em produção co
 | `20261007120000_display_features` | `position`, `weekdays`/`daily_start`/`daily_end`, `companies.transition`, `display_heartbeats` | ✅ Aplicada |
 | `20261007180000_play_stats` | `ad_play_stats` + `record_ad_plays` | ✅ Aplicada |
 | `20261008000000_error_logs` | `error_logs` (monitoramento de erros) | ✅ Aplicada |
-| `20261009000000_admin_only_and_display_clock` | Escrita em empresas, anúncios e mídias só para ADMIN; `companies.show_clock`; TV avisada quando a empresa muda; exibições de até 30 dias | ⏳ Pendente |
-| `20261009120000_play_stats_history` | Histórico do relatório mantido ao excluir anúncio (título guardado); relatório somado no banco (`ad_play_report`) | ⏳ Pendente |
+| `20261009000000_admin_only_and_display_clock` | Escrita em empresas, anúncios e mídias só para ADMIN; `companies.show_clock`; TV avisada quando a empresa muda; exibições de até 30 dias | ✅ Aplicada |
+| `20261009120000_play_stats_history` | Histórico do relatório mantido ao excluir anúncio (título guardado); relatório somado no banco (`ad_play_report`) | ✅ Aplicada |
+| `20261015000000_user_delete_keeps_ads` | `advertisements.created_by`/`last_edited_by` com `ON DELETE SET NULL`: excluir quem criou ou editou anúncios não falha mais | ✅ Aplicada |
 
 > **Ordem de publicação:** aplicar as migrações **antes** de publicar o código. A partir do commit `6e5d228`, o código usa colunas e tabelas que só existem depois delas.
 
@@ -200,6 +201,7 @@ advertisements (id, title, description, type, content_url, thumbnail_url,
                 start_date, end_date, duration_seconds, status, position,
                 weekdays smallint[], daily_start time, daily_end time,
                 overlay_*, created_by, last_edited_by, created_at, updated_at)
+  created_by / last_edited_by → auth.users (ON DELETE SET NULL)
 
 ad_play_stats (day, company_id, advertisement_id, plays)   ← record_ad_plays()
 audit_logs (id, created_at, action, table_name, record_pk, user_id, user_email,
@@ -312,23 +314,23 @@ Eles encontraram um bug real: o embed `companies` ficou ambíguo depois da tabel
 | # | Achado | Status |
 |---|---|---|
 | S1–S12, B1–B10, P1–P3 | Rodada de 2026-10-06 (autorização, hash de senha, display privado, upload, auditoria, dependências etc.) | ✅ Corrigidos (ver o histórico do git) |
-| S13 | Visitantes anônimos conseguiam listar todos os usuários (nome, ID e papel) em `profiles` | ✅ Na migração `20261007000000` ⏳ |
+| S13 | Visitantes anônimos conseguiam listar todos os usuários (nome, ID e papel) em `profiles` | ✅ Na migração `20261007000000` |
 | S14 | Sem headers de segurança | ✅ CSP, X-Frame-Options, HSTS etc. |
 | S15 | Login sem limite de tentativas próprio | ✅ 10 a cada 15 min por IP e e-mail |
-| S16 | Políticas antigas de leitura pública e `audit_logs` gravável por usuários logados | ✅ Removidas e fechada (`20261007000000`) ⏳ |
-| S17 | Funções `SECURITY DEFINER` sem `search_path` fixo e `is_admin` chamável por anônimos | ✅ (`20261007000000`) ⏳ |
-| B11 | **"Desativar" anúncio não funcionava**: um trigger e um job diário reativavam o anúncio dentro do período (e duplicavam a auditoria) | ✅ Removidos (`20261007000000`) ⏳ |
+| S16 | Políticas antigas de leitura pública e `audit_logs` gravável por usuários logados | ✅ Removidas e fechada (`20261007000000`) |
+| S17 | Funções `SECURITY DEFINER` sem `search_path` fixo e `is_admin` chamável por anônimos | ✅ (`20261007000000`) |
+| B11 | **"Desativar" anúncio não funcionava**: um trigger e um job diário reativavam o anúncio dentro do período (e duplicavam a auditoria) | ✅ Removidos (`20261007000000`) |
 | B12 | Editar ou excluir um anúncio de outro usuário deixava a mídia antiga no Storage (a política do bucket só deixa o dono apagar) | ✅ Remoção com service role + cron diário de órfãos |
 | B13 | Se o primeiro carregamento falhasse, a TV ficava travada na tela de erro | ✅ Recarrega sozinha |
 | B14 | Com um único anúncio e mídia quebrada, a tela ficava quebrada | ✅ Aviso e nova tentativa |
 | B15 | Vídeos eram cortados na duração configurada | ✅ Tocam até o fim (a duração vira o mínimo) |
-| B16 | Empresas não eram auditadas | ✅ Trigger em `companies`, sem a senha (`20261007000000`) ⏳ |
+| B16 | Empresas não eram auditadas | ✅ Trigger em `companies`, sem a senha (`20261007000000`) |
+| B17 | Excluir um usuário que criou ou editou anúncios falhava com "Database error deleting user" (FK sem `ON DELETE`) | ✅ `ON DELETE SET NULL` (`20261015000000`); ao excluir, o ADMIN escolhe deixar os anúncios sem autor ou transferi-los para outro usuário |
 | P4 | A API do display fazia 3 consultas a cada 30 s por TV e mandava o anúncio inteiro | ✅ 1 consulta, só as colunas usadas, ETag/304 |
 | P5 | Imagens enviadas no tamanho original (fotos de 5–10 MB) | ✅ WebP até 4K no navegador |
 | — | Ausência de schema versionado, ambiente de teste, CI, testes de ponta a ponta e tipos do banco | ✅ Tudo adicionado |
 
 ### Pendências
-- **Aplicar as migrações** pendentes e marcar a linha de base como aplicada (seção 3), **antes** de publicar o código.
 - **Vercel:** definir `CRON_SECRET` para ativar a limpeza diária. Opcionalmente, definir `NEXT_PUBLIC_SITE_URL`.
 - **Supabase Auth:**
   - em *Authentication → URL Configuration*, incluir `https://<seu-domínio>/auth/callback` nas Redirect URLs;

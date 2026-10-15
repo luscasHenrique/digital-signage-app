@@ -2,6 +2,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { getAuthContext } from "@/lib/auth";
 import { userFormSchema, type UserFormData } from "@/lib/schemas";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -123,9 +124,27 @@ export async function updateUser(data: UserFormData): Promise<FormActionResult> 
   }
 }
 
-// Action para EXCLUIR um usuário
-export async function deleteUser(
+// Quantos anúncios o usuário criou (para o diálogo de exclusão)
+export async function countUserAdvertisements(
   userId: string
+): Promise<number | null> {
+  if (!(await getAdminContext())) return null;
+  if (!z.string().uuid().safeParse(userId).success) return null;
+
+  const { count, error } = await supabaseAdmin
+    .from("advertisements")
+    .select("id", { count: "exact", head: true })
+    .eq("created_by", userId);
+
+  return error ? null : (count ?? 0);
+}
+
+// Action para EXCLUIR um usuário.
+// transferToId: anúncios criados por ele passam para esse usuário.
+// Sem transferToId, os anúncios ficam sem autor (FK com ON DELETE SET NULL).
+export async function deleteUser(
+  userId: string,
+  transferToId?: string | null
 ): Promise<{ success: boolean; message: string }> {
   const ctx = await getAdminContext();
   if (!ctx) return { success: false, message: ACCESS_DENIED };
@@ -136,8 +155,37 @@ export async function deleteUser(
   if (userId === ctx.user.id) {
     return { success: false, message: "Você não pode excluir a si mesmo." };
   }
+  if (transferToId) {
+    if (!z.string().uuid().safeParse(transferToId).success) {
+      return { success: false, message: "Usuário de destino inválido." };
+    }
+    if (transferToId === userId) {
+      return {
+        success: false,
+        message: "Escolha outro usuário para receber os anúncios.",
+      };
+    }
+  }
 
   try {
+    if (transferToId) {
+      const { data: target, error: targetError } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .eq("id", transferToId)
+        .maybeSingle();
+      if (targetError) throw targetError;
+      if (!target) {
+        return { success: false, message: "Usuário de destino não encontrado." };
+      }
+
+      const { error: transferError } = await supabaseAdmin
+        .from("advertisements")
+        .update({ created_by: transferToId })
+        .eq("created_by", userId);
+      if (transferError) throw transferError;
+    }
+
     const { data, error } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
     if (error) throw error;
@@ -150,6 +198,7 @@ export async function deleteUser(
     }
 
     revalidatePath("/dashboard/admin/usuarios");
+    if (transferToId) revalidatePath("/dashboard", "layout");
     return { success: true, message: "Usuário excluído com sucesso!" };
   } catch (error) {
     console.error("ERRO AO EXCLUIR USUÁRIO:", error);

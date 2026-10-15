@@ -1,10 +1,8 @@
 // src/components/admin/users/UsersClient.tsx
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { deleteUser } from "@/actions/users";
-import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { RowActions } from "@/components/admin/RowActions";
 import { Avatar } from "@/components/ui/Avatar/Avatar";
@@ -13,9 +11,9 @@ import { Button } from "@/components/ui/Button/Button";
 import { Dialog } from "@/components/ui/Dialog/Dialog";
 import { Table, type TableColumn } from "@/components/ui/Table/Table";
 import { TextField } from "@/components/ui/TextField/TextField";
-import { useToast } from "@/components/ui/Toast/Toast";
 import { normalizeSearch } from "@/lib/search";
 import { UserRole, UserWithProfile } from "@/types";
+import { DeleteUserDialog } from "./DeleteUserDialog";
 import { UserForm } from "./UserForm";
 
 interface UsersClientProps {
@@ -23,15 +21,12 @@ interface UsersClientProps {
 }
 
 export function UsersClient({ users }: UsersClientProps) {
-  const toast = useToast();
-
   const [query, setQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserWithProfile | null>(null);
   const [userToDelete, setUserToDelete] = useState<UserWithProfile | null>(
     null
   );
-  const [isDeletePending, startDeleteTransition] = useTransition();
 
   const filtered = useMemo(() => {
     const q = normalizeSearch(query);
@@ -44,17 +39,6 @@ export function UsersClient({ users }: UsersClientProps) {
   const handleOpenModal = (user: UserWithProfile | null) => {
     setCurrentUser(user);
     setIsModalOpen(true);
-  };
-
-  const handleDeleteUser = () => {
-    if (!userToDelete) return;
-
-    startDeleteTransition(async () => {
-      const result = await deleteUser(userToDelete.id);
-      if (result.success) toast.success(result.message);
-      else toast.error(result.message);
-      setUserToDelete(null);
-    });
   };
 
   const columns: TableColumn<UserWithProfile>[] = [
@@ -178,19 +162,10 @@ export function UsersClient({ users }: UsersClientProps) {
         />
       </Dialog>
 
-      <ConfirmDialog
-        open={!!userToDelete}
-        onOpenChange={(open) => !open && setUserToDelete(null)}
-        title="Excluir usuário?"
-        description={
-          <>
-            O usuário <strong>{userToDelete?.email}</strong> perderá o acesso ao
-            painel. Esta ação não pode ser desfeita.
-          </>
-        }
-        confirmLabel="Excluir usuário"
-        loading={isDeletePending}
-        onConfirm={handleDeleteUser}
+      <DeleteUserDialog
+        user={userToDelete}
+        users={users}
+        onClose={() => setUserToDelete(null)}
       />
     </>
   );
