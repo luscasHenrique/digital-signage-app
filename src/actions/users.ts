@@ -140,8 +140,9 @@ export async function countUserAdvertisements(
 }
 
 // Action para EXCLUIR um usuário.
-// transferToId: anúncios criados por ele passam para esse usuário.
-// Sem transferToId, os anúncios ficam sem autor (FK com ON DELETE SET NULL).
+// transferToId: anúncios criados por ele passam para esse usuário; sem ele,
+// ficam sem autor. A função no banco faz tudo numa transação (troca de
+// autor registrada na auditoria + exclusão do usuário em auth.users).
 export async function deleteUser(
   userId: string,
   transferToId?: string | null
@@ -149,8 +150,8 @@ export async function deleteUser(
   const ctx = await getAdminContext();
   if (!ctx) return { success: false, message: ACCESS_DENIED };
 
-  if (!userId) {
-    return { success: false, message: "ID do usuário não fornecido." };
+  if (!z.string().uuid().safeParse(userId).success) {
+    return { success: false, message: "ID do usuário inválido." };
   }
   if (userId === ctx.user.id) {
     return { success: false, message: "Você não pode excluir a si mesmo." };
@@ -167,46 +168,26 @@ export async function deleteUser(
     }
   }
 
-  try {
-    if (transferToId) {
-      const { data: target, error: targetError } = await supabaseAdmin
-        .from("profiles")
-        .select("id")
-        .eq("id", transferToId)
-        .maybeSingle();
-      if (targetError) throw targetError;
-      if (!target) {
-        return { success: false, message: "Usuário de destino não encontrado." };
-      }
-
-      const { error: transferError } = await supabaseAdmin
-        .from("advertisements")
-        .update({ created_by: transferToId })
-        .eq("created_by", userId);
-      if (transferError) throw transferError;
+  const { data: moved, error } = await supabaseAdmin.rpc(
+    "delete_user_and_reassign_ads",
+    {
+      p_user_id: userId,
+      p_actor_id: ctx.user.id,
+      p_transfer_to: transferToId || undefined,
     }
+  );
 
-    const { data, error } = await supabaseAdmin.auth.admin.deleteUser(userId);
-
-    if (error) throw error;
-
-    // Verificação de falha silenciosa
-    if (!data.user) {
-      throw new Error(
-        "Falha silenciosa ao excluir usuário. Verifique as permissões do servidor."
-      );
-    }
-
-    revalidatePath("/dashboard/admin/usuarios");
-    if (transferToId) revalidatePath("/dashboard", "layout");
-    return { success: true, message: "Usuário excluído com sucesso!" };
-  } catch (error) {
+  if (error) {
     console.error("ERRO AO EXCLUIR USUÁRIO:", error);
     return {
       success: false,
-      message: `Falha ao excluir o usuário: ${errorMessage(error)}`,
+      message: `Falha ao excluir o usuário: ${error.message}`,
     };
   }
+
+  revalidatePath("/dashboard/admin/usuarios");
+  if (moved) revalidatePath("/dashboard", "layout");
+  return { success: true, message: "Usuário excluído com sucesso!" };
 }
 
 function errorMessage(error: unknown): string {

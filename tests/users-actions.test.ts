@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   updateUserById: vi.fn(),
   deleteUser: vi.fn(),
   from: vi.fn(),
+  rpc: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -21,6 +22,7 @@ vi.mock("@/lib/supabase/admin", () => ({
       },
     },
     from: mocks.from,
+    rpc: mocks.rpc,
   },
 }));
 
@@ -39,6 +41,7 @@ const newUser = {
   role: UserRole.ADMIN,
 };
 
+const MY_ID = "00000000-0000-4000-8000-000000000000";
 const OTHER_ID = "11111111-1111-4111-8111-111111111111";
 const TARGET_ID = "22222222-2222-4222-8222-222222222222";
 
@@ -72,6 +75,7 @@ describe("actions de usuários (S1)", () => {
     expect(mocks.updateUserById).not.toHaveBeenCalled();
     expect(mocks.deleteUser).not.toHaveBeenCalled();
     expect(mocks.from).not.toHaveBeenCalled();
+    expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
   it("permite ADMIN criar usuário", async () => {
@@ -91,75 +95,61 @@ describe("actions de usuários (S1)", () => {
   });
 
   it("impede ADMIN de excluir a si mesmo ou remover o próprio papel", async () => {
-    loggedAs(UserRole.ADMIN, "me");
+    loggedAs(UserRole.ADMIN, MY_ID);
 
-    expect((await deleteUser("me")).success).toBe(false);
+    expect((await deleteUser(MY_ID)).success).toBe(false);
     expect(
-      (await updateUser({ ...newUser, id: "me", role: UserRole.STANDARD }))
+      (await updateUser({ ...newUser, id: MY_ID, role: UserRole.STANDARD }))
         .success
     ).toBe(false);
-    expect(mocks.deleteUser).not.toHaveBeenCalled();
+    expect(mocks.rpc).not.toHaveBeenCalled();
     expect(mocks.updateUserById).not.toHaveBeenCalled();
   });
 
-  it("permite ADMIN excluir outro usuário", async () => {
-    loggedAs(UserRole.ADMIN, "me");
-    mocks.deleteUser.mockResolvedValue({
-      data: { user: { id: "outro" } },
-      error: null,
+  describe("exclusão (função delete_user_and_reassign_ads)", () => {
+    beforeEach(() => {
+      loggedAs(UserRole.ADMIN, MY_ID);
+      mocks.rpc.mockResolvedValue({ data: 0, error: null });
     });
 
-    expect((await deleteUser("outro")).success).toBe(true);
-    expect(mocks.deleteUser).toHaveBeenCalledWith("outro");
-  });
+    it("sem destino, os anúncios ficam sem autor", async () => {
+      expect((await deleteUser(OTHER_ID, null)).success).toBe(true);
+      expect(mocks.rpc).toHaveBeenCalledWith("delete_user_and_reassign_ads", {
+        p_user_id: OTHER_ID,
+        p_actor_id: MY_ID,
+        p_transfer_to: undefined,
+      });
+      expect(mocks.deleteUser).not.toHaveBeenCalled();
+    });
 
-  describe("anúncios do usuário excluído", () => {
-    beforeEach(() => {
-      loggedAs(UserRole.ADMIN, "me");
-      mocks.deleteUser.mockResolvedValue({
-        data: { user: { id: OTHER_ID } },
-        error: null,
+    it("com destino, transfere na mesma chamada", async () => {
+      mocks.rpc.mockResolvedValue({ data: 3, error: null });
+
+      expect((await deleteUser(OTHER_ID, TARGET_ID)).success).toBe(true);
+      expect(mocks.rpc).toHaveBeenCalledWith("delete_user_and_reassign_ads", {
+        p_user_id: OTHER_ID,
+        p_actor_id: MY_ID,
+        p_transfer_to: TARGET_ID,
       });
     });
 
-    it("sem destino, só exclui (anúncios ficam sem autor pela FK)", async () => {
-      expect((await deleteUser(OTHER_ID, null)).success).toBe(true);
-      expect(mocks.from).not.toHaveBeenCalled();
-      expect(mocks.deleteUser).toHaveBeenCalledWith(OTHER_ID);
-    });
-
-    it("transfere os anúncios antes de excluir", async () => {
-      const profile = fakeQuery({ data: { id: TARGET_ID } });
-      const ads = fakeQuery();
-      mocks.from.mockImplementation((table: string) =>
-        table === "profiles" ? profile.query : ads.query
-      );
-
-      expect((await deleteUser(OTHER_ID, TARGET_ID)).success).toBe(true);
-      expect(ads.calls).toEqual([
-        ["update", [{ created_by: TARGET_ID }]],
-        ["eq", ["created_by", OTHER_ID]],
-      ]);
-      expect(mocks.deleteUser).toHaveBeenCalledWith(OTHER_ID);
-    });
-
-    it("recusa destino inválido, inexistente ou o próprio usuário", async () => {
+    it("recusa IDs inválidos ou o próprio usuário como destino", async () => {
+      expect((await deleteUser("nao-e-uuid")).success).toBe(false);
       expect((await deleteUser(OTHER_ID, "nao-e-uuid")).success).toBe(false);
       expect((await deleteUser(OTHER_ID, OTHER_ID)).success).toBe(false);
-      // fakeQuery padrão: perfil de destino não encontrado
-      expect((await deleteUser(OTHER_ID, TARGET_ID)).success).toBe(false);
-      expect(mocks.deleteUser).not.toHaveBeenCalled();
+      expect(mocks.rpc).not.toHaveBeenCalled();
     });
 
-    it("não exclui se a transferência falhar", async () => {
-      const profile = fakeQuery({ data: { id: TARGET_ID } });
-      const ads = fakeQuery({ error: new Error("falhou") });
-      mocks.from.mockImplementation((table: string) =>
-        table === "profiles" ? profile.query : ads.query
-      );
+    it("mostra o erro do banco (nada é alterado)", async () => {
+      mocks.rpc.mockResolvedValue({
+        data: null,
+        error: { message: "Usuário de destino não encontrado." },
+      });
 
-      expect((await deleteUser(OTHER_ID, TARGET_ID)).success).toBe(false);
-      expect(mocks.deleteUser).not.toHaveBeenCalled();
+      expect(await deleteUser(OTHER_ID, TARGET_ID)).toEqual({
+        success: false,
+        message: "Falha ao excluir o usuário: Usuário de destino não encontrado.",
+      });
     });
 
     it("conta os anúncios criados pelo usuário", async () => {

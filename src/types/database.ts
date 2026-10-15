@@ -412,6 +412,14 @@ export type Database = {
           "retry_after_seconds": number;
         }[];
       };
+      "delete_user_and_reassign_ads": {
+        Args: {
+          "p_actor_id": string;
+          "p_transfer_to"?: string;
+          "p_user_id": string;
+        };
+        Returns: number;
+      };
       "is_admin": {
         Args: {
           "uid": string;

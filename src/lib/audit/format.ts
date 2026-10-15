@@ -37,6 +37,7 @@ const FIELD_LABEL: Record<string, string> = {
   email: "E-mail",
   full_name: "Nome completo",
   role: "Função",
+  author: "Autor",
 };
 
 /** Campos sensíveis: a tela mostra só que mudaram, nunca o valor. */
