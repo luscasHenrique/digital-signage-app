@@ -101,7 +101,7 @@ As migrações ficam em `supabase/migrations/` e são aplicadas em produção co
 | `20261009120000_play_stats_history` | Histórico do relatório mantido ao excluir anúncio (título guardado); relatório somado no banco (`ad_play_report`) | ✅ Aplicada |
 | `20261015000000_user_delete_keeps_ads` | `advertisements.created_by`/`last_edited_by` com `ON DELETE SET NULL`: excluir quem criou ou editou anúncios não falha mais | ✅ Aplicada |
 | `20261015120000_delete_user_atomic` | `delete_user_and_reassign_ads`: transfere (ou deixa sem autor) os anúncios, audita a troca de autor e exclui o usuário numa transação; TVs não são avisadas quando o anúncio só muda de autor | ✅ Aplicada |
-| `20261016000000_editor_role` | Papel Editor (STANDARD): cria, edita, ordena e exclui anúncios e envia mídias (`can_edit_ads`); empresas continuam só ADMIN | ⏳ Pendente |
+| `20261016000000_editor_role` | Papel Editor (STANDARD): cria, edita, ordena e exclui anúncios e envia mídias (`can_edit_ads`); empresas continuam só ADMIN | ✅ Aplicada |
 
 > **Ordem de publicação:** aplicar as migrações **antes** de publicar o código. A partir do commit `6e5d228`, o código usa colunas e tabelas que só existem depois delas.
 
@@ -331,13 +331,12 @@ Eles encontraram um bug real: o embed `companies` ficou ambíguo depois da tabel
 | B18 | A exclusão com transferência era feita em dois passos (transferir, depois excluir) e a troca de autor não aparecia na auditoria | ✅ Uma função no banco faz tudo numa transação e registra "Autor: antes → depois" em cada anúncio (`20261015120000`) |
 | B19 | Trocar só o autor de um anúncio fazia as TVs recarregarem a lista | ✅ O aviso ignora `created_by`, `last_edited_by` e `updated_at` (`20261015120000`) |
 | B20 | O build baixava as fontes do Google Fonts e falhava sem acesso a ele | ✅ Fontes locais (`@fontsource-variable` + `next/font/local`) |
-| B21 | O usuário STANDARD não podia criar anúncios e não tinha função no sistema | ✅ Virou Editor: gerencia anúncios e mídias; empresas, usuários, auditoria e erros seguem só ADMIN (`20261016000000`) ⏳ |
+| B21 | O usuário STANDARD não podia criar anúncios e não tinha função no sistema | ✅ Virou Editor: gerencia anúncios e mídias; empresas, usuários, auditoria e erros seguem só ADMIN (`20261016000000`) |
 | P4 | A API do display fazia 3 consultas a cada 30 s por TV e mandava o anúncio inteiro | ✅ 1 consulta, só as colunas usadas, ETag/304 |
 | P5 | Imagens enviadas no tamanho original (fotos de 5–10 MB) | ✅ WebP até 4K no navegador |
 | — | Ausência de schema versionado, ambiente de teste, CI, testes de ponta a ponta e tipos do banco | ✅ Tudo adicionado |
 
 ### Pendências
-- **Aplicar a migração `20261016000000`** **antes** de publicar o código: sem ela, o banco recusa os anúncios do Editor.
 - **Vercel:** definir `CRON_SECRET` para ativar a limpeza diária. Opcionalmente, definir `NEXT_PUBLIC_SITE_URL`.
 - **Supabase Auth:**
   - em *Authentication → URL Configuration*, incluir `https://<seu-domínio>/auth/callback` nas Redirect URLs;
