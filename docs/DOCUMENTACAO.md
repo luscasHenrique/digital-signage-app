@@ -25,7 +25,7 @@ Plataforma de **sinalização digital (digital signage)**. No painel, os usuári
 | Empresas | Cadastro com slug único, página **privada** com senha opcional e **transição** do player; mostra o **status da TV** ("No ar", "Sem sinal há X", "Nunca abriu") |
 | Display | Slideshow em tela cheia, atualizado por Realtime e por consulta a cada 30 s. Funciona **offline** (service worker) e conta as exibições |
 | Relatórios | Exibições e tempo de tela por anúncio e por tela, num período |
-| Usuários (só ADMIN) | Cadastro de usuários com papéis `ADMIN` / `STANDARD` |
+| Usuários (só ADMIN) | Cadastro de usuários com papéis `ADMIN` (Administrador) / `STANDARD` (Editor: gerencia anúncios) |
 | Auditoria (só ADMIN) | Histórico de `audit_logs` (anúncios, empresas e perfis), preenchido por triggers |
 | Erros (só ADMIN) | Falhas do servidor, do painel e das TVs (`error_logs`, 30 dias) |
 
@@ -80,7 +80,7 @@ npx supabase db reset   # aplica as migrações e o seed
 ```
 
 Crie um `.env.development.local` com a URL `http://127.0.0.1:54321` e as chaves mostradas pelo `supabase start`. No `npm run dev`, esse arquivo tem prioridade sobre o `.env.local`. O seed (`supabase/seed.sql`, que nunca vai para produção) cria:
-- os usuários `admin@local.test` (ADMIN) e `standard@local.test` (STANDARD), com a senha `Senha-local-123`;
+- os usuários `admin@local.test` (ADMIN) e `standard@local.test` (STANDARD, Editor), com a senha `Senha-local-123`;
 - as telas `loja-centro` (pública) e `loja-privada` (senha `1234`);
 - três anúncios.
 
@@ -101,6 +101,7 @@ As migrações ficam em `supabase/migrations/` e são aplicadas em produção co
 | `20261009120000_play_stats_history` | Histórico do relatório mantido ao excluir anúncio (título guardado); relatório somado no banco (`ad_play_report`) | ✅ Aplicada |
 | `20261015000000_user_delete_keeps_ads` | `advertisements.created_by`/`last_edited_by` com `ON DELETE SET NULL`: excluir quem criou ou editou anúncios não falha mais | ✅ Aplicada |
 | `20261015120000_delete_user_atomic` | `delete_user_and_reassign_ads`: transfere (ou deixa sem autor) os anúncios, audita a troca de autor e exclui o usuário numa transação; TVs não são avisadas quando o anúncio só muda de autor | ✅ Aplicada |
+| `20261016000000_editor_role` | Papel Editor (STANDARD): cria, edita, ordena e exclui anúncios e envia mídias (`can_edit_ads`); empresas continuam só ADMIN | ⏳ Pendente |
 
 > **Ordem de publicação:** aplicar as migrações **antes** de publicar o código. A partir do commit `6e5d228`, o código usa colunas e tabelas que só existem depois delas.
 
@@ -168,7 +169,7 @@ A interface usa o design system [liquid-glass-ui](https://github.com/luscasHenri
 |---|---|---|
 | `/`, `/login`, `/recuperar-senha` | Público | Início, login e pedido de nova senha |
 | `/auth/callback` | Público | Valida o link do e-mail (só redireciona para caminhos internos) |
-| `/dashboard/...` (anúncios, empresas, relatórios, conta) | Logado (STANDARD só consulta; criar, editar, ordenar e excluir é só ADMIN) | Painel |
+| `/dashboard/...` (anúncios, empresas, relatórios, conta) | Logado. Anúncios: ADMIN e Editor (STANDARD) criam, editam, ordenam e excluem. Empresas: Editor só consulta; criar, editar e excluir é só ADMIN | Painel |
 | `/dashboard/admin/usuarios`, `/dashboard/admin/auditoria` | **Só ADMIN** (os demais recebem 404) | Administração |
 | `/display/[slug]` | Público, ou cookie válido se a empresa for privada | Player |
 | `/display/[slug]/auth` | Público | Senha da empresa privada |
@@ -179,7 +180,7 @@ A interface usa o design system [liquid-glass-ui](https://github.com/luscasHenri
 Camadas de autorização:
 - **middleware:** sessão em `/dashboard/*` via `getUser()`;
 - **páginas admin:** `requireAdminPage()`;
-- **Server Actions:** `getAuthContext()`; as de empresas e anúncios exigem ADMIN;
+- **Server Actions:** `getAuthContext()`; as de empresas exigem ADMIN e as de anúncios exigem `canEditAds` (ADMIN ou Editor com perfil);
 - **display:** `hasDisplayAccess()`;
 - **banco:** RLS e grants de coluna.
 
@@ -218,7 +219,7 @@ Storage: bucket público "advertisements", caminho <user_id>/<timestamp>-<nome>
 |---|---|---|---|
 | `profiles` | — | lê todos; altera só `full_name`/`avatar_url` do próprio | admin via service role |
 | `companies` | — | lê as colunas públicas (sem `password`) | só ADMIN |
-| `advertisements`, `advertisements_companies` | — | lê | só ADMIN |
+| `advertisements`, `advertisements_companies` | — | lê | ADMIN e Editor (`can_edit_ads`) |
 | `display_signals` | lê | lê | triggers |
 | `display_heartbeats`, `ad_play_stats` | — | lê | servidor (service role) |
 | `audit_logs` | — | só ADMIN lê | triggers |
@@ -330,11 +331,13 @@ Eles encontraram um bug real: o embed `companies` ficou ambíguo depois da tabel
 | B18 | A exclusão com transferência era feita em dois passos (transferir, depois excluir) e a troca de autor não aparecia na auditoria | ✅ Uma função no banco faz tudo numa transação e registra "Autor: antes → depois" em cada anúncio (`20261015120000`) |
 | B19 | Trocar só o autor de um anúncio fazia as TVs recarregarem a lista | ✅ O aviso ignora `created_by`, `last_edited_by` e `updated_at` (`20261015120000`) |
 | B20 | O build baixava as fontes do Google Fonts e falhava sem acesso a ele | ✅ Fontes locais (`@fontsource-variable` + `next/font/local`) |
+| B21 | O usuário STANDARD não podia criar anúncios e não tinha função no sistema | ✅ Virou Editor: gerencia anúncios e mídias; empresas, usuários, auditoria e erros seguem só ADMIN (`20261016000000`) ⏳ |
 | P4 | A API do display fazia 3 consultas a cada 30 s por TV e mandava o anúncio inteiro | ✅ 1 consulta, só as colunas usadas, ETag/304 |
 | P5 | Imagens enviadas no tamanho original (fotos de 5–10 MB) | ✅ WebP até 4K no navegador |
 | — | Ausência de schema versionado, ambiente de teste, CI, testes de ponta a ponta e tipos do banco | ✅ Tudo adicionado |
 
 ### Pendências
+- **Aplicar a migração `20261016000000`** **antes** de publicar o código: sem ela, o banco recusa os anúncios do Editor.
 - **Vercel:** definir `CRON_SECRET` para ativar a limpeza diária. Opcionalmente, definir `NEXT_PUBLIC_SITE_URL`.
 - **Supabase Auth:**
   - em *Authentication → URL Configuration*, incluir `https://<seu-domínio>/auth/callback` nas Redirect URLs;

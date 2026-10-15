@@ -72,7 +72,7 @@ export function UsersClient({ users }: UsersClientProps) {
         ) : u.role === UserRole.ADMIN ? (
           <Badge tone="accent">Administrador</Badge>
         ) : (
-          <Badge>Padrão</Badge>
+          <Badge>Editor</Badge>
         ),
     },
     {

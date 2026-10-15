@@ -32,12 +32,18 @@ interface CompaniesClientProps {
   companies: CompanyWithStatus[];
   /** Só ADMIN cria, edita e exclui empresas */
   canEdit: boolean;
+  /** Editor gerencia os anúncios da empresa, mas não a empresa em si. */
+  canManageAds: boolean;
 }
 
 /** Atualiza o status das TVs enquanto a página está aberta. */
 const STATUS_REFRESH_MS = 60_000;
 
-export function CompaniesClient({ companies, canEdit }: CompaniesClientProps) {
+export function CompaniesClient({
+  companies,
+  canEdit,
+  canManageAds,
+}: CompaniesClientProps) {
   const router = useRouter();
   const toast = useToast();
 
@@ -154,7 +160,7 @@ export function CompaniesClient({ companies, canEdit }: CompaniesClientProps) {
                 ]
               : []),
             {
-              label: canEdit ? "Gerenciar anúncios" : "Ver anúncios",
+              label: canManageAds ? "Gerenciar anúncios" : "Ver anúncios",
               icon: <Megaphone />,
               onSelect: () =>
                 router.push(`/dashboard/empresas/${c.id}/anuncios`),

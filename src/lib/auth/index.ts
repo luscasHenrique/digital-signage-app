@@ -10,6 +10,8 @@ import { UserRole } from "@/types";
 export interface AuthContext {
   user: User;
   role: UserRole;
+  /** ADMIN ou Editor (STANDARD) com perfil: cria e altera anúncios. */
+  canEditAds: boolean;
   fullName: string | null;
   supabase: SupabaseClient;
 }
@@ -35,7 +37,17 @@ export async function getAuthContext(
   const role =
     profile?.role === UserRole.ADMIN ? UserRole.ADMIN : UserRole.STANDARD;
 
-  return { user, role, fullName: profile?.full_name ?? null, supabase };
+  // Mesma regra de public.can_edit_ads: conta sem perfil não altera anúncios
+  const canEditAds =
+    profile?.role === UserRole.ADMIN || profile?.role === UserRole.STANDARD;
+
+  return {
+    user,
+    role,
+    canEditAds,
+    fullName: profile?.full_name ?? null,
+    supabase,
+  };
 }
 
 /**

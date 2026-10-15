@@ -20,13 +20,13 @@ interface UserFormProps {
 const roleOptions = [
   {
     value: UserRole.STANDARD,
-    label: "Padrão",
-    description: "Gerencia anúncios e empresas.",
+    label: "Editor",
+    description: "Cria, edita e exclui anúncios. Vê empresas e relatórios.",
   },
   {
     value: UserRole.ADMIN,
     label: "Administrador",
-    description: "Também gerencia usuários e vê a auditoria.",
+    description: "Também gerencia empresas e usuários e vê auditoria e erros.",
   },
 ];
 

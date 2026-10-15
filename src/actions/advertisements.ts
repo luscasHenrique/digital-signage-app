@@ -23,19 +23,21 @@ import {
   AdvertisementStatus,
   AdvertisementType,
   OverlayPosition,
-  UserRole,
   type OrderListAd,
 } from "@/types";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-const NOT_ADMIN = "Apenas administradores podem alterar anúncios.";
+const NOT_EDITOR = "Seu usuário não tem permissão para alterar anúncios.";
 
-/** Só ADMIN configura anúncios e mídias (o RLS do banco aplica a mesma regra). */
-async function getAdminContext() {
+/**
+ * ADMIN e Editor (STANDARD) configuram anúncios e mídias
+ * (o RLS do banco aplica a mesma regra com public.can_edit_ads).
+ */
+async function getEditorContext() {
   const ctx = await getAuthContext();
   if (!ctx) return { ctx: null, error: "Não autenticado." } as const;
-  if (ctx.role !== UserRole.ADMIN) return { ctx: null, error: NOT_ADMIN } as const;
+  if (!ctx.canEditAds) return { ctx: null, error: NOT_EDITOR } as const;
   return { ctx, error: null } as const;
 }
 
@@ -219,7 +221,7 @@ export async function createAdvertisement(data: ActionInput) {
     return { success: false, message: validation.error.flatten().fieldErrors };
   }
 
-  const { ctx, error: authError } = await getAdminContext();
+  const { ctx, error: authError } = await getEditorContext();
   if (!ctx) return { success: false, message: { _server: [authError] } };
   const { supabase, user } = ctx;
 
@@ -267,7 +269,7 @@ export async function updateAdvertisement(data: ActionInput) {
     return { success: false, message: validation.error.flatten().fieldErrors };
   }
 
-  const { ctx, error: authError } = await getAdminContext();
+  const { ctx, error: authError } = await getEditorContext();
   if (!ctx) return { success: false, message: { _server: [authError] } };
   const { supabase, user } = ctx;
 
@@ -321,7 +323,7 @@ export async function updateAdvertisement(data: ActionInput) {
 
 // ACTION PARA ELIMINAR ANÚNCIO
 export async function deleteAdvertisement(adId: string) {
-  const { ctx, error: authError } = await getAdminContext();
+  const { ctx, error: authError } = await getEditorContext();
   if (!ctx) return { success: false, message: authError };
   if (!adId) return { success: false, message: "ID do anúncio não fornecido." };
   const { supabase } = ctx;
@@ -365,7 +367,7 @@ export async function getSignedUploadUrl({
   fileType: string;
   fileSize: number;
 }) {
-  const { ctx, error: authError } = await getAdminContext();
+  const { ctx, error: authError } = await getEditorContext();
   if (!ctx) return { success: false, message: authError };
 
   const invalid = validateUploadFile({ type: fileType, size: fileSize });
@@ -398,7 +400,7 @@ export async function getSignedUploadUrl({
  * Só apaga arquivos da pasta do próprio usuário e que nenhum anúncio esteja usando.
  */
 export async function discardUploads(urls: string[]) {
-  const { ctx, error: authError } = await getAdminContext();
+  const { ctx, error: authError } = await getEditorContext();
   if (!ctx) return { success: false, message: authError };
 
   const candidates = Array.from(new Set(urls)).slice(0, 10);
@@ -426,7 +428,7 @@ export async function reorderAdvertisements(ids: string[]) {
   const parsed = z.array(z.string().uuid()).min(1).max(1000).safeParse(ids);
   if (!parsed.success) return { success: false, message: "Lista inválida." };
 
-  const { ctx, error: authError } = await getAdminContext();
+  const { ctx, error: authError } = await getEditorContext();
   if (!ctx) return { success: false, message: authError };
 
   const { error } = await ctx.supabase.rpc("reorder_advertisements", {
@@ -454,7 +456,7 @@ export async function setAdvertisementsStatus(
     return { success: false, message: "Seleção inválida." };
   }
 
-  const { ctx, error: authError } = await getAdminContext();
+  const { ctx, error: authError } = await getEditorContext();
   if (!ctx) return { success: false, message: authError };
 
   const { error } = await ctx.supabase
@@ -476,7 +478,7 @@ export async function deleteAdvertisements(ids: string[]) {
   const parsed = idsSchema.safeParse(ids);
   if (!parsed.success) return { success: false, message: "Seleção inválida." };
 
-  const { ctx, error: authError } = await getAdminContext();
+  const { ctx, error: authError } = await getEditorContext();
   if (!ctx) return { success: false, message: authError };
 
   try {

@@ -9,7 +9,6 @@ import {
 } from "@/lib/ads/queries";
 import { getPageAuthContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { UserRole } from "@/types";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Anúncios da empresa" };
@@ -52,7 +51,7 @@ export default async function CompanyAdsPage({
       perPage={ADS_PER_PAGE}
       filters={filters}
       companies={companies}
-      canEdit={ctx?.role === UserRole.ADMIN}
+      canEdit={!!ctx?.canEditAds}
       title={`Anúncios · ${company.name}`}
       description={`Anúncios exibidos na tela /display/${company.slug}.`}
       defaultCompanyId={company.id}

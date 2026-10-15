@@ -94,6 +94,7 @@ describe("limpeza do Storage", () => {
     mocks.getAuthContext.mockResolvedValue({
       user: { id: "eu" },
       role: UserRole.ADMIN,
+      canEditAds: true,
       supabase: client,
     });
     adminUsage([], []);
@@ -106,7 +107,7 @@ describe("limpeza do Storage", () => {
   });
 
   it("não apaga arquivo que outro anúncio ainda usa", async () => {
-    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" }, role: UserRole.ADMIN });
+    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" }, role: UserRole.ADMIN, canEditAds: true });
     const usado = `${STORAGE}/eu/usado.png`;
     const livre = `${STORAGE}/eu/livre.png`;
     adminUsage([usado], []);
@@ -116,7 +117,7 @@ describe("limpeza do Storage", () => {
   });
 
   it("descartar uploads ignora arquivos de outros usuários", async () => {
-    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" }, role: UserRole.ADMIN });
+    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" }, role: UserRole.ADMIN, canEditAds: true });
 
     const result = await discardUploads([
       `${STORAGE}/outro/a.png`,
@@ -147,7 +148,7 @@ describe("ações em lote", () => {
 
   it("altera o status de todos os selecionados numa consulta", async () => {
     const { client, log } = fakeClient({ advertisements: [{}] });
-    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" }, role: UserRole.ADMIN, supabase: client });
+    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" }, role: UserRole.ADMIN, canEditAds: true, supabase: client });
 
     const result = await setAdvertisementsStatus([ID1, ID2], AdvertisementStatus.INACTIVE);
     expect(result).toEqual({ success: true, message: "2 anúncio(s) desativado(s)." });
@@ -161,7 +162,7 @@ describe("ações em lote", () => {
         {},
       ],
     });
-    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" }, role: UserRole.ADMIN, supabase: client });
+    mocks.getAuthContext.mockResolvedValue({ user: { id: "eu" }, role: UserRole.ADMIN, canEditAds: true, supabase: client });
     const admin = fakeClient({ advertisements: [{ data: [] }, { data: [] }] });
     mocks.adminFrom.mockImplementation(admin.client.from);
 
@@ -174,11 +175,12 @@ describe("ações em lote", () => {
 describe("permissões", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("usuário STANDARD não altera anúncios", async () => {
+  it("conta sem perfil não altera anúncios", async () => {
     const { client, log } = fakeClient();
     mocks.getAuthContext.mockResolvedValue({
       user: { id: "eu" },
       role: UserRole.STANDARD,
+      canEditAds: false,
       supabase: client,
     });
     const id = "11111111-1111-4111-8111-111111111111";
@@ -192,5 +194,20 @@ describe("permissões", () => {
 
     for (const result of results) expect(result.success).toBe(false);
     expect(log).toHaveLength(0);
+  });
+
+  it("Editor (STANDARD) altera anúncios", async () => {
+    const { client, log } = fakeClient({ advertisements: [{}] });
+    mocks.getAuthContext.mockResolvedValue({
+      user: { id: "eu" },
+      role: UserRole.STANDARD,
+      canEditAds: true,
+      supabase: client,
+    });
+    const id = "11111111-1111-4111-8111-111111111111";
+
+    const result = await setAdvertisementsStatus([id], AdvertisementStatus.INACTIVE);
+    expect(result.success).toBe(true);
+    expect(log[0].calls).toContainEqual(["in", ["id", [id]]]);
   });
 });

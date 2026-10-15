@@ -27,6 +27,7 @@ export default async function EmpresasPage() {
     <CompaniesClient
       companies={(companies ?? []) as unknown as CompanyWithStatus[]}
       canEdit={ctx?.role === UserRole.ADMIN}
+      canManageAds={!!ctx?.canEditAds}
     />
   );
 }

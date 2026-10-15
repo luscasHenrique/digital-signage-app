@@ -401,6 +401,12 @@ export type Database = {
           "seconds": number;
         }[];
       };
+      "can_edit_ads": {
+        Args: {
+          "uid": string;
+        };
+        Returns: boolean;
+      };
       "consume_rate_limit": {
         Args: {
           "p_key": string;

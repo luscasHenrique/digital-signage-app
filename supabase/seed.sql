@@ -4,7 +4,7 @@
 --
 -- Usuários (senha: Senha-local-123)
 --   admin@local.test     ADMIN
---   standard@local.test  STANDARD
+--   standard@local.test  STANDARD (Editor: gerencia anúncios)
 -- =====================================================================
 
 do $$

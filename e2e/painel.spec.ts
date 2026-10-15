@@ -20,6 +20,18 @@ test.describe("painel", () => {
     await expect(page.getByText("Página não encontrada")).toBeVisible();
   });
 
+  test("editor gerencia anúncios, mas não empresas", async ({ page }) => {
+    await login(page, "standard@local.test");
+    await page.goto("/dashboard/anuncios");
+    await expect(
+      page.getByRole("button", { name: "Novo anúncio" }).first()
+    ).toBeVisible();
+
+    await page.goto("/dashboard/empresas");
+    await expect(page.getByRole("heading", { name: "Empresas" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Nova empresa" })).toHaveCount(0);
+  });
+
   test("desativar em lote tira o anúncio do ar", async ({ page }) => {
     // Anúncio só deste teste (o setup global apaga os "E2E ...")
     const admin = createClient(
