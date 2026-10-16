@@ -22,7 +22,10 @@ const contentSecurityPolicy = [
   `media-src 'self' blob: https: ${supabaseOrigin}`,
   "font-src 'self' data:",
   `connect-src 'self' ${supabaseOrigin} ${supabaseRealtimeOrigin}`,
-  "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com",
+  // Vídeos incorporados podem vir de qualquer player https (só usuários do
+  // painel cadastram; o iframe da tela roda com sandbox, sem pop-ups nem
+  // navegação da página)
+  "frame-src https:",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

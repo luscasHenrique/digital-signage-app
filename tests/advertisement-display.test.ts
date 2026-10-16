@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   contentUrlProblem,
+  directVideoUrl,
   endOfDay,
   getAdSchedule,
   getEmbedUrl,
@@ -8,6 +9,7 @@ import {
   getYoutubeEmbedUrl,
   getYoutubeThumbnailUrl,
   getYoutubeVideoId,
+  isPlatformVideoUrl,
   startOfDay,
 } from "@/lib/ads/advertisement";
 import { AdvertisementStatus, AdvertisementType } from "@/types";
@@ -57,15 +59,47 @@ describe("Vimeo e validação de links", () => {
     expect(embed).toContain("background=1");
     expect(embed).toContain("muted=1");
     expect(embed).toContain("h=abc123ef");
-    expect(getEmbedUrl("https://exemplo.com/video")).toBeNull();
+  });
+});
+
+describe("outras plataformas e embeds genéricos", () => {
+  it.each([
+    ["https://www.dailymotion.com/video/x8abc12", "dailymotion.com/embed/video/x8abc12"],
+    ["https://dai.ly/x8abc12", "dailymotion.com/embed/video/x8abc12"],
+    ["https://www.loom.com/share/abc123", "loom.com/embed/abc123"],
+    ["https://drive.google.com/file/d/FILEID/view?usp=sharing", "drive.google.com/file/d/FILEID/preview"],
+    ["https://streamable.com/xyz9", "streamable.com/e/xyz9"],
+    ["https://www.twitch.tv/canal", "player.twitch.tv/?channel=canal&parent=tela.exemplo.com"],
+    ["https://www.twitch.tv/videos/123", "player.twitch.tv/?video=123"],
+    ["https://www.facebook.com/pagina/videos/123", "facebook.com/plugins/video.php?href="],
+  ])("converte %s", (url, expected) => {
+    expect(getEmbedUrl(url, "tela.exemplo.com")).toContain(expected);
   });
 
-  it("recusa link que a TV não consegue tocar com o tipo escolhido", () => {
+  it("usa qualquer player https como está, inclusive colando o <iframe>", () => {
+    expect(getEmbedUrl("https://player.exemplo.com/v/1")).toBe("https://player.exemplo.com/v/1");
+    expect(
+      getEmbedUrl('<iframe width="560" src="https://player.exemplo.com/v/1?a=1&amp;b=2" allowfullscreen></iframe>')
+    ).toBe("https://player.exemplo.com/v/1?a=1&b=2");
+    expect(getEmbedUrl("http://inseguro.com/v")).toBeNull();
+    expect(getEmbedUrl("javascript:alert(1)")).toBeNull();
+  });
+
+  it("aceita qualquer fonte de vídeo, mas não vídeo no tipo imagem", () => {
     const yt = "https://www.youtube.com/watch?v=abc";
     expect(contentUrlProblem(AdvertisementType.EMBED_LINK, yt)).toBeNull();
-    expect(contentUrlProblem(AdvertisementType.EMBED_LINK, "https://exemplo.com/x")).not.toBeNull();
-    expect(contentUrlProblem(AdvertisementType.VIDEO_LINK, yt)).not.toBeNull();
+    expect(contentUrlProblem(AdvertisementType.EMBED_LINK, "https://player.exemplo.com/x")).toBeNull();
+    expect(contentUrlProblem(AdvertisementType.VIDEO_LINK, yt)).toBeNull();
     expect(contentUrlProblem(AdvertisementType.VIDEO_LINK, "https://cdn.exemplo.com/a.mp4")).toBeNull();
+    expect(contentUrlProblem(AdvertisementType.IMAGE_LINK, yt)).not.toBeNull();
+    expect(isPlatformVideoUrl(yt)).toBe(true);
+    expect(isPlatformVideoUrl("https://cdn.exemplo.com/a.mp4")).toBe(false);
+  });
+
+  it("transforma link de compartilhamento do Dropbox em arquivo direto", () => {
+    expect(directVideoUrl("https://www.dropbox.com/s/abc/video.mp4?dl=0")).toBe(
+      "https://www.dropbox.com/s/abc/video.mp4?raw=1"
+    );
   });
 });
 

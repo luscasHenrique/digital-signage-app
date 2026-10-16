@@ -3,7 +3,10 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAuthContext } from "@/lib/auth";
-import { contentUrlProblem } from "@/lib/ads/advertisement";
+import {
+  contentUrlProblem,
+  normalizeContentUrl,
+} from "@/lib/ads/advertisement";
 import { ORDER_LIST_COLUMNS } from "@/lib/ads/queries";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
@@ -131,8 +134,14 @@ const actionSchema = z
     description: z.string().optional(),
     type: z.nativeEnum(AdvertisementType),
 
-    // URL do conteúdo (obrigatório para qualquer tipo válido: upload ou link)
-    content_url: z.string().optional(),
+    // URL do conteúdo (obrigatório para qualquer tipo válido: upload ou link).
+    // Um código <iframe> colado vira só o endereço dele.
+    content_url: z
+      .string()
+      .optional()
+      .transform((value) =>
+        value === undefined ? value : normalizeContentUrl(value)
+      ),
 
     // Thumbnail como URL (OPCIONAL)
     thumbnail_url: z.string().optional(),

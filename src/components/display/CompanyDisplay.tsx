@@ -2,8 +2,19 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getEmbedUrl } from "@/lib/ads/advertisement";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import {
+  directVideoUrl,
+  getEmbedUrl,
+  isPlatformVideoUrl,
+} from "@/lib/ads/advertisement";
 import { isPlayableNow } from "@/lib/ads/weekly-schedule";
 import { reportClientError } from "@/lib/errors/reporter";
 import { isOptimizableImage } from "@/lib/storage";
@@ -341,7 +352,11 @@ export function CompanyDisplay({
               <div className={styles.preload} aria-hidden="true">
                 {isImage(nextAd) && <AdImage ad={nextAd} />}
                 {isVideo(nextAd) && (
-                  <video src={nextAd.content_url} preload="auto" muted />
+                  <video
+                    src={directVideoUrl(nextAd.content_url)}
+                    preload="auto"
+                    muted
+                  />
                 )}
               </div>
             )}
@@ -414,10 +429,31 @@ function isImage(ad: DisplayAd) {
   );
 }
 
+/** Toca no <video> da própria tela (arquivo enviado ou link direto do arquivo). */
 function isVideo(ad: DisplayAd) {
   return (
     ad.type === AdvertisementType.VIDEO_UPLOAD ||
-    ad.type === AdvertisementType.VIDEO_LINK
+    (ad.type === AdvertisementType.VIDEO_LINK &&
+      !isPlatformVideoUrl(ad.content_url))
+  );
+}
+
+/** Abre num iframe: embed ou link de página do YouTube, Vimeo, Drive etc. */
+function isEmbed(ad: DisplayAd) {
+  return (
+    ad.type === AdvertisementType.EMBED_LINK ||
+    (ad.type === AdvertisementType.VIDEO_LINK &&
+      isPlatformVideoUrl(ad.content_url))
+  );
+}
+
+const noSubscribe = () => () => {};
+/** Domínio da tela (a Twitch exige no player); null durante o SSR. */
+function useHostname() {
+  return useSyncExternalStore(
+    noSubscribe,
+    () => window.location.hostname,
+    () => null
   );
 }
 
@@ -449,6 +485,7 @@ function AdContent({
   onVideoEnded?: () => boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const hostname = useHostname();
 
   // Garante o autoplay (alguns navegadores de TV ignoram o atributo)
   useEffect(() => {
@@ -465,7 +502,7 @@ function AdContent({
     return (
       <video
         ref={videoRef}
-        src={ad.content_url}
+        src={directVideoUrl(ad.content_url)}
         muted
         autoPlay
         playsInline
@@ -481,7 +518,13 @@ function AdContent({
     );
   }
 
-  const embedUrl = getEmbedUrl(ad.content_url);
+  if (!isEmbed(ad)) {
+    return <p className={styles.empty}>Conteúdo indisponível para este link.</p>;
+  }
+  // Espera o navegador para montar o endereço (a Twitch precisa do domínio)
+  if (!hostname) return null;
+
+  const embedUrl = getEmbedUrl(ad.content_url, hostname);
   if (embedUrl) {
     return (
       <iframe
@@ -490,6 +533,8 @@ function AdContent({
         className="size-full border-0"
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
         referrerPolicy="strict-origin-when-cross-origin"
+        // Players de terceiros não abrem pop-ups nem tiram a TV da página
+        sandbox="allow-scripts allow-same-origin allow-presentation"
       />
     );
   }
@@ -500,8 +545,9 @@ function AdContent({
 /**
  * Anúncios que podem passar agora (período + dias/horários). Mantém a mesma
  * referência enquanto o conteúdo não muda, para não reiniciar o slideshow.
- * Sem internet, YouTube/Vimeo não carregam: saem da fila enquanto houver
- * outros anúncios (imagens e vídeos enviados ficam no cache da TV).
+ * Sem internet, vídeos incorporados (YouTube, Vimeo...) não carregam: saem da
+ * fila enquanto houver outros anúncios (imagens e vídeos enviados ficam no
+ * cache da TV).
  */
 function usePlaylist(
   ads: DisplayAd[],
@@ -512,9 +558,7 @@ function usePlaylist(
   return useMemo(() => {
     const now = new Date(clock);
     const playable = ads.filter((ad) => isPlayableNow(ad, now));
-    const offlineReady = playable.filter(
-      (ad) => ad.type !== AdvertisementType.EMBED_LINK
-    );
+    const offlineReady = playable.filter((ad) => !isEmbed(ad));
     const next =
       online || offlineReady.length === 0 ? playable : offlineReady;
     const same =

@@ -14,7 +14,10 @@ Cada empresa tem uma tela em `https://SEU-DOMINIO/display/<endereço-da-empresa>
   - na hora, quando alguém altera um anúncio da empresa;
   - de qualquer forma, a cada 30 segundos.
 - **Mostra o relógio** (hora e data) no canto, se a opção **Mostrar horário na tela** estiver ligada na empresa. A mudança chega na TV em segundos, sem recarregar.
-- **Toca vídeos do YouTube e do Vimeo** (tipo "YouTube / Vimeo"), sem som e em loop. O painel recusa links que a TV não consegue tocar, como um link do YouTube no tipo "Vídeo (link .mp4)".
+- **Toca vídeos de várias fontes**, sem som:
+  - **Vídeo (link):** arquivo MP4/WEBM de qualquer site (inclusive link de compartilhamento do Dropbox) ou a página do vídeo no YouTube, Vimeo, Google Drive etc.;
+  - **Vídeo incorporado (embed):** YouTube, Vimeo, Dailymotion, Loom, Google Drive, Streamable, Twitch, Facebook ou qualquer outro player. Dá para colar o link ou o código `<iframe>` inteiro que o site oferece em "Incorporar".
+  - Vídeos incorporados ficam na tela pela duração configurada no anúncio.
 - **Não deixa a TV apagar**: pede ao navegador para manter a tela ligada.
 - **Esconde o cursor e o botão de tela cheia** depois de 3 segundos sem mexer o mouse.
 - **Pula anúncios quebrados**: se uma imagem ou vídeo não carrega, vai para o próximo. Se for o único, mostra "Conteúdo indisponível no momento" e tenta de novo em 1 minuto.

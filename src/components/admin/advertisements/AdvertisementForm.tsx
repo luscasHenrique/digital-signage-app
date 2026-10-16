@@ -32,6 +32,7 @@ import {
   endOfDay,
   isUploadType,
   isVideoType,
+  normalizeContentUrl,
   startOfDay,
 } from "@/lib/ads/advertisement";
 import { applyActionErrors } from "@/lib/form-errors";
@@ -95,13 +96,13 @@ const typeOptions = [
   {
     value: AdvertisementType.VIDEO_LINK,
     label: AD_TYPE_LABEL[AdvertisementType.VIDEO_LINK],
-    description: "Endereço direto de um arquivo de vídeo.",
+    description: "Arquivo MP4/WEBM de qualquer site ou página do YouTube, Vimeo, Drive...",
     icon: <Link2 />,
   },
   {
     value: AdvertisementType.EMBED_LINK,
     label: AD_TYPE_LABEL[AdvertisementType.EMBED_LINK],
-    description: "Link de um vídeo do YouTube ou do Vimeo.",
+    description: "Qualquer player: YouTube, Vimeo, Loom, Twitch... ou código <iframe>.",
     icon: <Youtube />,
   },
 ];
@@ -324,18 +325,27 @@ export function AdvertisementForm({
                 <TextField
                   {...field}
                   value={field.value ?? ""}
-                  type="url"
+                  // "text": aceita colar o código <iframe> inteiro
+                  type={adType === AdvertisementType.EMBED_LINK ? "text" : "url"}
+                  onChange={(e) =>
+                    field.onChange(normalizeContentUrl(e.target.value))
+                  }
                   label={
                     adType === AdvertisementType.EMBED_LINK
-                      ? "Link do YouTube ou do Vimeo"
+                      ? "Link do vídeo ou código <iframe>"
                       : "URL do conteúdo"
                   }
                   placeholder={
                     adType === AdvertisementType.EMBED_LINK
-                      ? "https://www.youtube.com/watch?v=... ou https://vimeo.com/..."
+                      ? 'https://... ou <iframe src="https://..."></iframe>'
                       : adType === AdvertisementType.VIDEO_LINK
-                        ? "https://.../video.mp4"
+                        ? "https://.../video.mp4 ou link do YouTube, Vimeo, Drive..."
                         : "https://..."
+                  }
+                  hint={
+                    adType === AdvertisementType.EMBED_LINK
+                      ? "YouTube, Vimeo, Dailymotion, Loom, Google Drive, Streamable, Twitch, Facebook ou qualquer player que permita incorporação."
+                      : undefined
                   }
                   leftIcon={<Link2 />}
                   required
